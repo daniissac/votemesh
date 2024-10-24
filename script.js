@@ -40,23 +40,21 @@ function createPoll() {
 function joinPoll(hostId) {
     const conn = peer.connect(hostId);
     handleConnection(conn);
+    conn.on('open', () => {
+        conn.send({ type: 'request-poll-data' });
+    });
 }
 
 function handleConnection(conn) {
     connections.push(conn);
     
-    conn.on('open', () => {
-        if (pollData.question) {
-            conn.send({ type: 'poll-data', data: pollData });
-        }
-    });
-
     conn.on('data', (data) => {
-        if (data.type === 'poll-data') {
+        if (data.type === 'request-poll-data' && pollData.question) {
+            conn.send({ type: 'poll-data', data: pollData });
+        } else if (data.type === 'poll-data') {
             pollData = data.data;
-            document.getElementById('creator-section').classList.add('hidden');
-            document.getElementById('voter-section').classList.remove('hidden');
             displayPoll();
+            displayResults();
         } else if (data.type === 'vote') {
             pollData.votes[data.option]++;
             displayResults();
