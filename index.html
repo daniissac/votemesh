@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoteMesh - P2P Polling</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="script.js" defer></script>
+    <link rel="icon" type="image/svg+xml" href="/votemesh-icon.svg">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex items-center justify-center mb-8">
+            <img src="/votemesh-icon.svg" alt="VoteMesh" class="w-12 h-12 mr-2">
+            <h1 class="text-3xl font-bold text-green-600">VoteMesh</h1>
+        </div>
+        
+        <div id="creator-section" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Create Poll</h2>
+            <input type="text" id="question" placeholder="Enter your question" class="w-full p-2 border rounded mb-4">
+            <div id="options-container">
+                <input type="text" class="option-input w-full p-2 border rounded mb-2" placeholder="Option 1">
+                <input type="text" class="option-input w-full p-2 border rounded mb-2" placeholder="Option 2">
+            </div>
+            <button onclick="addOption()" class="bg-gray-200 px-4 py-2 rounded mr-2">Add Option</button>
+            <button onclick="createPoll()" class="bg-green-500 text-white px-4 py-2 rounded">Create Poll</button>
+        </div>
+
+        <div id="voter-section" class="bg-white rounded-lg shadow-lg p-6 hidden">
+            <h2 id="poll-question" class="text-xl font-semibold mb-4"></h2>
+            <div id="poll-options" class="space-y-2"></div>
+            <div id="results" class="mt-6"></div>
+        </div>
+
+        <div id="share-section" class="bg-white rounded-lg shadow-lg p-6 mt-6 hidden">
+            <h3 class="text-lg font-semibold mb-2">Share Poll</h3>
+            <input type="text" id="share-url" readonly class="w-full p-2 border rounded">
+            <button onclick="copyShareUrl()" class="mt-2 bg-blue-500 text-white px-4 py-2 rounded">Copy Link</button>
+        </div>
+    </div>
+</body>
+</html>
