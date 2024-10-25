@@ -1,7 +1,50 @@
-let peer = new Peer();
 let connections = [];
 let pollData = {};
-let votes = {};
+const discovery = new PeerDiscovery();
+
+async function initializeVoteMesh() {
+    const nodeId = crypto.getRandomValues(new Uint8Array(32))[0];
+    await discovery.joinNetwork(nodeId);
+    setupNetworkListeners();
+}
+
+function setupNetworkListeners() {
+    discovery.on('peerDiscovered', async (peerId) => {
+        const connection = new WebRTCConnection(peerId);
+        connections.push(connection);
+        await establishConnection(connection);
+    });
+}
+
+async function createPoll(question, options) {
+    pollData = {
+        id: crypto.randomUUID(),
+        question,
+        options,
+        votes: {},
+        timestamp: Date.now()
+    };
+    
+    discovery.broadcastPoll(pollData);
+    return pollData.id;
+}
+
+function castVote(optionId) {
+    pollData.votes[optionId] = (pollData.votes[optionId] || 0) + 1;
+    connections.forEach(conn => conn.sendVote({
+        pollId: pollData.id,
+        optionId
+    }));
+}
+
+function updatePollData(vote) {
+    if (vote.pollId === pollData.id) {
+        pollData.votes[vote.optionId] = (pollData.votes[vote.optionId] || 0) + 1;
+        updateUI();
+    }
+}
+
+initializeVoteMesh();
 
 peer.on('open', (id) => {
     if (window.location.hash) {
@@ -36,7 +79,6 @@ function createPoll() {
     displayPoll();
     displayResults();
 }
-
 function joinPoll(hostId) {
     const conn = peer.connect(hostId);
     handleConnection(conn);

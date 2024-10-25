@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VoteMesh - P2P Polling</title>
+    <title>VoteMesh - Fully Decentralized P2P Polling</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="dht.js"></script>
+    <script src="webrtc.js"></script>
+    <script src="peer-discovery.js"></script>
     <script src="script.js" defer></script>
     <link rel="icon" type="image/svg+xml" href="/votemesh-icon.svg">
 </head>
@@ -16,6 +18,12 @@
             <h1 class="text-3xl font-bold text-green-600">VoteMesh</h1>
         </div>
         
+        <div id="network-status" class="bg-white rounded-lg shadow-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold">Network Status</h3>
+            <p id="peer-count" class="text-sm text-gray-600">Connected Peers: 0</p>
+            <p id="dht-status" class="text-sm text-gray-600">DHT Status: Initializing...</p>
+        </div>
+
         <div id="creator-section" class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 class="text-xl font-semibold mb-4">Create Poll</h2>
             <input type="text" id="question" placeholder="Enter your question" class="w-full p-2 border rounded mb-4">
