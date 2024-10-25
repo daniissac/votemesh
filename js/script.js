@@ -1,3 +1,8 @@
+import { DHTNode } from './dht.js';
+import { WebRTCConnection } from './webrtc.js';
+import { PeerDiscovery } from './peer-discovery.js';
+import { EventEmitter } from './event-emitter.js';
+
 // Core state
 let connections = [];
 let pollData = {};
@@ -19,6 +24,26 @@ function setupNetworkListeners() {
         await establishConnection(connection);
         updateNetworkStatus();
     });
+
+    discovery.on('pollBroadcast', (peerId, poll) => {
+        if (poll.id !== pollData.id) {
+            pollData = poll;
+            displayPoll();
+            displayResults();
+        }
+    });
+}
+
+async function establishConnection(connection) {
+    try {
+        const offer = await connection.createOffer();
+        const answer = await discovery.sendOffer(connection.peerId, offer);
+        await connection.handleAnswer(answer);
+        return true;
+    } catch (error) {
+        console.error('Failed to establish connection:', error);
+        return false;
+    }
 }
 
 // Poll creation and management
@@ -142,3 +167,11 @@ window.addEventListener('hashchange', async () => {
 
 // Initialize the application
 initializeVoteMesh();
+
+// Export functions for external use
+export {
+    createPoll,
+    submitVote,
+    addOption,
+    copyShareUrl
+};

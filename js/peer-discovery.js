@@ -1,10 +1,12 @@
-class PeerDiscovery extends EventEmitter {
+import { DHTNode } from './dht.js';
+import { EventEmitter } from './event-emitter.js';
+
+export class PeerDiscovery extends EventEmitter {
     constructor() {
         super();
         this.dht = null;
         this.peers = new Set();
         this.bootstrapNodes = [
-            // List of known bootstrap nodes
             '0x1234567890abcdef',
             '0xabcdef1234567890'
         ];

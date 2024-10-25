@@ -1,4 +1,4 @@
-class WebRTCConnection {
+export class WebRTCConnection {
     constructor(peerId) {
         this.peerId = peerId;
         this.connection = new RTCPeerConnection({
@@ -41,4 +41,21 @@ class WebRTCConnection {
             vote: vote
         }));
     }
+}
+
+async function establishConnection(connection) {
+    try {
+        const offer = await connection.createOffer();
+        await connection.handleAnswer(await sendOfferToPeer(offer));
+        return true;
+    } catch (error) {
+        console.error('Failed to establish connection:', error);
+        return false;
+    }
+}
+
+async function sendOfferToPeer(offer) {
+    // Send offer through DHT and wait for answer
+    const peerAnswer = await discovery.sendOffer(offer);
+    return peerAnswer;
 }
