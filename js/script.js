@@ -1,11 +1,15 @@
+// Core state
 let connections = [];
 let pollData = {};
 const discovery = new PeerDiscovery();
+const BASE_URL = '/votemesh';
 
+// Network initialization
 async function initializeVoteMesh() {
     const nodeId = crypto.getRandomValues(new Uint8Array(32))[0];
     await discovery.joinNetwork(nodeId);
     setupNetworkListeners();
+    updateNetworkStatus();
 }
 
 function setupNetworkListeners() {
@@ -13,50 +17,11 @@ function setupNetworkListeners() {
         const connection = new WebRTCConnection(peerId);
         connections.push(connection);
         await establishConnection(connection);
+        updateNetworkStatus();
     });
 }
 
-async function createPoll(question, options) {
-    pollData = {
-        id: crypto.randomUUID(),
-        question,
-        options,
-        votes: {},
-        timestamp: Date.now()
-    };
-    
-    discovery.broadcastPoll(pollData);
-    return pollData.id;
-}
-
-function castVote(optionId) {
-    pollData.votes[optionId] = (pollData.votes[optionId] || 0) + 1;
-    connections.forEach(conn => conn.sendVote({
-        pollId: pollData.id,
-        optionId
-    }));
-}
-
-function updatePollData(vote) {
-    if (vote.pollId === pollData.id) {
-        pollData.votes[vote.optionId] = (pollData.votes[vote.optionId] || 0) + 1;
-        updateUI();
-    }
-}
-
-initializeVoteMesh();
-
-peer.on('open', (id) => {
-    if (window.location.hash) {
-        const hostId = window.location.hash.substring(1);
-        joinPoll(hostId);
-    }
-});
-
-peer.on('connection', (conn) => {
-    handleConnection(conn);
-});
-
+// Poll creation and management
 function createPoll() {
     const question = document.getElementById('question').value;
     const options = Array.from(document.getElementsByClassName('option-input'))
@@ -64,47 +29,46 @@ function createPoll() {
         .filter(value => value.trim() !== '');
 
     pollData = {
+        id: crypto.randomUUID(),
         question,
         options,
-        votes: Object.fromEntries(options.map(opt => [opt, 0]))
+        votes: Object.fromEntries(options.map(opt => [opt, 0])),
+        timestamp: Date.now()
     };
 
+    discovery.broadcastPoll(pollData);
+    showPollInterface();
+    displayPoll();
+    displayResults();
+}
+
+function showPollInterface() {
     document.getElementById('creator-section').classList.add('hidden');
     document.getElementById('share-section').classList.remove('hidden');
     document.getElementById('voter-section').classList.remove('hidden');
     
-    const shareUrl = `${window.location.origin}${window.location.pathname}#${peer.id}`;
+    const pollId = pollData.id;
+    const shareUrl = `${window.location.origin}${BASE_URL}#${pollId}`;
     document.getElementById('share-url').value = shareUrl;
-    
-    displayPoll();
+}
+
+// Voting functionality
+function submitVote(option) {
+    pollData.votes[option]++;
+    broadcastVote(option);
     displayResults();
 }
-function joinPoll(hostId) {
-    const conn = peer.connect(hostId);
-    handleConnection(conn);
-    conn.on('open', () => {
-        conn.send({ type: 'request-poll-data' });
+
+function broadcastVote(option) {
+    connections.forEach(conn => {
+        conn.sendVote({ 
+            pollId: pollData.id, 
+            option 
+        });
     });
 }
 
-function handleConnection(conn) {
-    connections.push(conn);
-    
-    conn.on('data', (data) => {
-        if (data.type === 'request-poll-data' && pollData.question) {
-            conn.send({ type: 'poll-data', data: pollData });
-        } else if (data.type === 'poll-data') {
-            pollData = data.data;
-            displayPoll();
-            displayResults();
-        } else if (data.type === 'vote') {
-            pollData.votes[data.option]++;
-            displayResults();
-            broadcastVote(data.option);
-        }
-    });
-}
-
+// UI updates
 function displayPoll() {
     document.getElementById('poll-question').textContent = pollData.question;
     const optionsContainer = document.getElementById('poll-options');
@@ -116,18 +80,6 @@ function displayPoll() {
         button.textContent = option;
         button.onclick = () => submitVote(option);
         optionsContainer.appendChild(button);
-    });
-}
-
-function submitVote(option) {
-    pollData.votes[option]++;
-    displayResults();
-    broadcastVote(option);
-}
-
-function broadcastVote(option) {
-    connections.forEach(conn => {
-        conn.send({ type: 'vote', option });
     });
 }
 
@@ -154,6 +106,12 @@ function displayResults() {
     });
 }
 
+function updateNetworkStatus() {
+    document.getElementById('peer-count').textContent = `Connected Peers: ${connections.length}`;
+    document.getElementById('dht-status').textContent = `DHT Status: Connected`;
+}
+
+// Utility functions
 function addOption() {
     const container = document.getElementById('options-container');
     const input = document.createElement('input');
@@ -169,3 +127,18 @@ function copyShareUrl() {
     document.execCommand('copy');
     alert('Share URL copied to clipboard!');
 }
+
+// Handle URL hash for joining polls
+window.addEventListener('hashchange', async () => {
+    const pollId = window.location.hash.substring(1);
+    if (pollId) {
+        pollData = await discovery.findPoll(pollId);
+        if (pollData) {
+            displayPoll();
+            displayResults();
+        }
+    }
+});
+
+// Initialize the application
+initializeVoteMesh();
