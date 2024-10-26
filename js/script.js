@@ -1,9 +1,9 @@
 // Core imports
-import { DHTNode } from './dht.js';
 import { WebRTCConnection } from './webrtc.js';
 import { PeerDiscovery } from './peer-discovery.js';
+import { createPoll, addOption, showPollInterface, copyShareUrl } from './poll.js';
 
-// Global state
+// Global state management
 const state = {
     discovery: null,
     connections: new Map(),
@@ -25,7 +25,7 @@ async function initializeVoteMesh() {
 }
 
 function generateNodeId() {
-    return new Uint8Array(crypto.getRandomValues(new Uint8Array(32)))[0];
+    return crypto.getRandomValues(new Uint8Array(32))[0];
 }
 
 function setupEventListeners() {
@@ -34,13 +34,12 @@ function setupEventListeners() {
     state.discovery.on('pollBroadcast', handlePollBroadcast);
     window.addEventListener('hashchange', handleUrlHash);
     
-    // UI events
-    document.getElementById('create-poll-btn')?.addEventListener('click', createPoll);
-    document.getElementById('add-option-btn')?.addEventListener('click', addOption);
-    document.getElementById('copy-url-btn')?.addEventListener('click', copyShareUrl);
+    // UI event bindings
+    document.getElementById('create-poll-btn')?.addEventListener('click', () => createPoll());
+    document.getElementById('add-option-btn')?.addEventListener('click', () => addOption());
+    document.getElementById('copy-url-btn')?.addEventListener('click', () => copyShareUrl());
 }
 
-// Network handlers
 async function handlePeerDiscovery(peerId) {
     const connection = new WebRTCConnection(peerId);
     state.connections.set(peerId, connection);
@@ -53,57 +52,6 @@ function handlePollBroadcast(peerId, poll) {
         state.currentPoll = poll;
         displayPoll();
     }
-}
-
-// Poll management
-function createPoll() {
-    const question = document.getElementById('question').value;
-    const options = Array.from(document.getElementsByClassName('option-input'))
-        .map(input => input.value.trim())
-        .filter(Boolean);
-
-    state.currentPoll = {
-        id: crypto.randomUUID(),
-        question,
-        options,
-        votes: Object.fromEntries(options.map(opt => [opt, 0])),
-        timestamp: Date.now()
-    };
-
-    state.discovery.broadcastPoll(state.currentPoll);
-    showVotingInterface();
-}
-
-function addOption() {
-    const container = document.getElementById('options-container');
-    const optionWrapper = document.createElement('div');
-    optionWrapper.className = 'flex gap-2 mb-2';
-    
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'option-input w-full p-2 border rounded';
-    input.placeholder = `Option ${container.children.length + 1}`;
-    input.required = true;
-    input.minLength = 1;
-    input.maxLength = 100;
-    
-    const removeButton = document.createElement('button');
-    removeButton.className = 'bg-red-500 text-white px-3 rounded hover:bg-red-600';
-    removeButton.textContent = '×';
-    removeButton.onclick = () => optionWrapper.remove();
-    
-    optionWrapper.appendChild(input);
-    optionWrapper.appendChild(removeButton);
-    container.appendChild(optionWrapper);
-}
-// UI management
-function showVotingInterface() {
-    document.getElementById('creator-section').classList.add('hidden');
-    document.getElementById('voter-section').classList.remove('hidden');
-    document.getElementById('share-section').classList.remove('hidden');
-    
-    const shareUrl = `${window.location.origin}/votemesh#${state.currentPoll.id}`;
-    document.getElementById('share-url').value = shareUrl;
 }
 
 function displayPoll() {
@@ -146,7 +94,6 @@ function displayResults() {
     });
 }
 
-// Voting functionality
 function submitVote(option) {
     state.currentPoll.votes[option]++;
     broadcastVote(option);
@@ -167,16 +114,9 @@ function broadcastVote(option) {
     });
 }
 
-// Utility functions
 function updateNetworkStatus() {
     document.getElementById('peer-count').textContent = `Connected Peers: ${state.connections.size}`;
     document.getElementById('dht-status').textContent = 'DHT Status: Connected';
-}
-
-function copyShareUrl() {
-    const shareUrl = document.getElementById('share-url');
-    shareUrl.select();
-    document.execCommand('copy');
 }
 
 async function handleUrlHash() {
@@ -184,7 +124,7 @@ async function handleUrlHash() {
     if (pollId) {
         state.currentPoll = await state.discovery.findPoll(pollId);
         if (state.currentPoll) {
-            showVotingInterface();
+            showPollInterface(state.currentPoll);
             displayPoll();
         }
     }
