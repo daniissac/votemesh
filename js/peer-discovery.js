@@ -5,7 +5,7 @@ import { WebRTCConnection } from './webrtc.js';
 export class PeerDiscovery extends EventEmitter {
     constructor() {
         super();
-        this.dht = null;
+        this.dht = new DHTNode(crypto.getRandomValues(new Uint8Array(32))[0]);
         this.peers = new Map();
         this.bootstrapNodes = [
             '0x1234567890abcdef',
@@ -14,18 +14,19 @@ export class PeerDiscovery extends EventEmitter {
     }
 
     async joinNetwork(nodeId) {
-        this.dht = new DHTNode(nodeId);
+        if (!this.dht) {
+            this.dht = new DHTNode(nodeId);
+        }
         
         for (const bootstrapId of this.bootstrapNodes) {
             try {
                 const peers = await this.dht.findNode(bootstrapId);
                 peers.forEach(([peerId]) => this.connectToPeer(peerId));
             } catch (error) {
-                console.warn(`Failed to connect to bootstrap node ${bootstrapId}`);
+                continue;
             }
         }
     }
-
     async connectToPeer(peerId) {
         if (!this.peers.has(peerId)) {
             const connection = new WebRTCConnection(peerId);
