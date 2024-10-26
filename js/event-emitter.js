@@ -5,24 +5,35 @@ export class EventEmitter {
 
     on(event, callback) {
         if (!this.events.has(event)) {
-            this.events.set(event, []);
+            this.events.set(event, new Set());
         }
-        this.events.get(event).push(callback);
+        this.events.get(event).add(callback);
+        return () => this.off(event, callback);
     }
 
     emit(event, ...args) {
         if (this.events.has(event)) {
-            this.events.get(event).forEach(callback => callback(...args));
+            this.events.get(event).forEach(callback => {
+                try {
+                    callback(...args);
+                } catch (error) {
+                    console.error(`Error in event ${event}:`, error);
+                }
+            });
         }
     }
 
     off(event, callback) {
         if (this.events.has(event)) {
-            const callbacks = this.events.get(event);
-            const index = callbacks.indexOf(callback);
-            if (index !== -1) {
-                callbacks.splice(index, 1);
-            }
+            this.events.get(event).delete(callback);
         }
+    }
+
+    once(event, callback) {
+        const wrapper = (...args) => {
+            callback(...args);
+            this.off(event, wrapper);
+        };
+        this.on(event, wrapper);
     }
 }

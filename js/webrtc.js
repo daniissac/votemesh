@@ -2,20 +2,53 @@ export class WebRTCConnection {
     constructor(peerId) {
         this.peerId = peerId;
         this.connection = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
         });
+        this.dataChannel = null;
+        this.onMessage = null;
+        this.setupConnection();
+    }
+
+    setupConnection() {
         this.dataChannel = this.connection.createDataChannel('voteMesh');
         this.setupEventListeners();
     }
 
     setupEventListeners() {
-        this.dataChannel.onmessage = this.handleMessage.bind(this);
-        this.dataChannel.onopen = () => console.log('Connection established with peer:', this.peerId);
-        this.connection.onicecandidate = event => {
+        this.dataChannel.onopen = () => {
+            console.log(`Connection established with peer: ${this.peerId}`);
+        };
+
+        this.dataChannel.onmessage = (event) => {
+            if (this.onMessage) {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.onMessage(data);
+                } catch (error) {
+                    console.error('Error parsing message:', error);
+                }
+            }
+        };
+
+        this.connection.onicecandidate = (event) => {
             if (event.candidate) {
                 this.broadcastIceCandidate(event.candidate);
             }
         };
+    }
+
+    async connect() {
+        try {
+            const offer = await this.createOffer();
+            await this.handleAnswer(await this.sendOfferToPeer(offer));
+            return true;
+        } catch (error) {
+            console.error('Connection failed:', error);
+            return false;
+        }
     }
 
     async createOffer() {
@@ -28,29 +61,15 @@ export class WebRTCConnection {
         await this.connection.setRemoteDescription(answer);
     }
 
-    handleMessage(event) {
-        const data = JSON.parse(event.data);
-        if (data.type === 'VOTE') {
-            updatePollData(data.vote);
+    send(data) {
+        if (this.dataChannel?.readyState === 'open') {
+            this.dataChannel.send(data);
         }
     }
 
-    sendVote(vote) {
-        this.dataChannel.send(JSON.stringify({
-            type: 'VOTE',
-            vote: vote
-        }));
-    }
-}
-
-async function establishConnection(connection) {
-    try {
-        const offer = await connection.createOffer();
-        await connection.handleAnswer(await sendOfferToPeer(offer));
-        return true;
-    } catch (error) {
-        console.error('Failed to establish connection:', error);
-        return false;
+    close() {
+        this.dataChannel?.close();
+        this.connection.close();
     }
 }
 

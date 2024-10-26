@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VoteMesh - Fully Decentralized P2P Polling</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script type="module" src="js/script.js"></script>
     <link rel="icon" type="image/svg+xml" href="public/votemesh-icon.svg">
 </head>
 <body class="bg-gray-100">
@@ -28,8 +27,8 @@
                 <input type="text" class="option-input w-full p-2 border rounded mb-2" placeholder="Option 1">
                 <input type="text" class="option-input w-full p-2 border rounded mb-2" placeholder="Option 2">
             </div>
-            <button onclick="addOption()" class="bg-gray-200 px-4 py-2 rounded mr-2">Add Option</button>
-            <button onclick="createPoll()" class="bg-green-500 text-white px-4 py-2 rounded">Create Poll</button>
+            <button id="add-option-btn" class="bg-gray-200 px-4 py-2 rounded mr-2">Add Option</button>
+            <button id="create-poll-btn" class="bg-green-500 text-white px-4 py-2 rounded">Create Poll</button>
         </div>
 
         <div id="voter-section" class="bg-white rounded-lg shadow-lg p-6 hidden">
@@ -41,8 +40,23 @@
         <div id="share-section" class="bg-white rounded-lg shadow-lg p-6 mt-6 hidden">
             <h3 class="text-lg font-semibold mb-2">Share Poll</h3>
             <input type="text" id="share-url" readonly class="w-full p-2 border rounded">
-            <button onclick="copyShareUrl()" class="mt-2 bg-blue-500 text-white px-4 py-2 rounded">Copy Link</button>
+            <button id="copy-url-btn" class="mt-2 bg-blue-500 text-white px-4 py-2 rounded">Copy Link</button>
         </div>
     </div>
+
+    <script type="module">
+        import { DHTNode } from './js/dht.js';
+        import { createPoll, addOption, copyShareUrl } from './js/poll.js';
+
+        // Initialize event listeners when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('add-option-btn').addEventListener('click', addOption);
+            document.getElementById('create-poll-btn').addEventListener('click', createPoll);
+            document.getElementById('copy-url-btn').addEventListener('click', copyShareUrl);
+        });
+
+        // Initialize DHT node
+        const dhtNode = new DHTNode();
+    </script>
 </body>
 </html>

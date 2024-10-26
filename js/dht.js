@@ -1,10 +1,23 @@
-class DHTNode {
+export class DHTNode {
     constructor(nodeId) {
         this.nodeId = nodeId;
         this.routingTable = new Map();
         this.storage = new Map();
-        this.k = 20;
-        this.maxAge = 3600000; // 1 hour TTL for stored data
+        this.k = 20; 
+        this.maxAge = 3600000;
+        this.initialize();
+    }
+
+    initialize() {
+        this.pingInterval = setInterval(() => this.pingNodes(), 60000);
+    }
+
+    pingNodes() {
+        this.routingTable.forEach((node, id) => {
+            if (Date.now() - node.lastSeen > this.maxAge) {
+                this.routingTable.delete(id);
+            }
+        });
     }
 
     distance(id1, id2) {
@@ -30,5 +43,9 @@ class DHTNode {
             return data.value;
         }
         return null;
+    }
+
+    cleanup() {
+        clearInterval(this.pingInterval);
     }
 }
