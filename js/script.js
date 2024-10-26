@@ -76,13 +76,26 @@ function createPoll() {
 
 function addOption() {
     const container = document.getElementById('options-container');
+    const optionWrapper = document.createElement('div');
+    optionWrapper.className = 'flex gap-2 mb-2';
+    
     const input = document.createElement('input');
     input.type = 'text';
-    input.className = 'option-input w-full p-2 border rounded mb-2';
+    input.className = 'option-input w-full p-2 border rounded';
     input.placeholder = `Option ${container.children.length + 1}`;
-    container.appendChild(input);
+    input.required = true;
+    input.minLength = 1;
+    input.maxLength = 100;
+    
+    const removeButton = document.createElement('button');
+    removeButton.className = 'bg-red-500 text-white px-3 rounded hover:bg-red-600';
+    removeButton.textContent = '×';
+    removeButton.onclick = () => optionWrapper.remove();
+    
+    optionWrapper.appendChild(input);
+    optionWrapper.appendChild(removeButton);
+    container.appendChild(optionWrapper);
 }
-
 // UI management
 function showVotingInterface() {
     document.getElementById('creator-section').classList.add('hidden');
