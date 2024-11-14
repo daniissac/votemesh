@@ -1,20 +1,40 @@
 export class WebRTCConnection {
-    constructor(peerId) {
+    constructor(peerId, discovery) {
         this.peerId = peerId;
+        this.discovery = discovery;
         this.connection = new RTCPeerConnection({
             iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
+                { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+                {
+                    urls: 'turn:turn.votemesh.network:3478',
+                    username: 'votemesh',
+                    credential: 'votemesh123'
+                }
             ]
         });
         this.dataChannel = null;
-        this.onMessage = null;
+        this.messageHandlers = new Map();
         this.setupConnection();
     }
 
     setupConnection() {
-        this.dataChannel = this.connection.createDataChannel('voteMesh');
+        this.dataChannel = this.connection.createDataChannel('voteMesh', {
+            ordered: true,
+            maxRetransmits: 3
+        });
+        
         this.setupEventListeners();
+        this.setupMessageHandlers();
+    }
+
+    setupMessageHandlers() {
+        this.addMessageHandler('POLL', this.handlePollMessage.bind(this));
+        this.addMessageHandler('VOTE', this.handleVoteMessage.bind(this));
+        this.addMessageHandler('SYNC', this.handleSyncMessage.bind(this));
+    }
+
+    addMessageHandler(type, handler) {
+        this.messageHandlers.set(type, handler);
     }
 
     setupEventListeners() {

@@ -5,61 +5,113 @@ import { WebRTCConnection } from './webrtc.js';
 export class PeerDiscovery extends EventEmitter {
     constructor() {
         super();
-        this.dht = new DHTNode(crypto.getRandomValues(new Uint8Array(32))[0]);
+        this.dht = new DHTNode();
         this.peers = new Map();
-        this.bootstrapNodes = [
-            '0x1234567890abcdef',
-            '0xabcdef1234567890'
-        ];
+        this.connecting = new Set();
+        this.maxPeers = 10;
+        this.reconnectDelay = 5000;
     }
 
-    async joinNetwork(nodeId) {
-        if (!this.dht) {
-            this.dht = new DHTNode(nodeId);
-        }
-        
-        for (const bootstrapId of this.bootstrapNodes) {
-            try {
-                const peers = await this.dht.findNode(bootstrapId);
-                peers.forEach(([peerId]) => this.connectToPeer(peerId));
-            } catch (error) {
-                continue;
+    async joinNetwork() {
+        try {
+            // Get initial peers from DHT
+            const peers = await this.dht.findNode(this.dht.nodeId);
+            
+            // Connect to discovered peers
+            for (const peer of peers) {
+                await this.connectToPeer(peer.id);
             }
+
+            // Start peer discovery loop
+            this.startPeerDiscovery();
+            
+            this.emit('networkJoined');
+            return true;
+        } catch (error) {
+            console.error('Failed to join network:', error);
+            throw error;
         }
     }
+
     async connectToPeer(peerId) {
-        if (!this.peers.has(peerId)) {
-            const connection = new WebRTCConnection(peerId);
-            this.peers.set(peerId, connection);
+        if (this.peers.has(peerId) || this.connecting.has(peerId)) {
+            return;
+        }
+
+        this.connecting.add(peerId);
+
+        try {
+            const connection = new WebRTCConnection(peerId, this);
             
+            // Set up message handler
             connection.onMessage = (data) => {
                 this.emit('peerMessage', peerId, data);
             };
 
             await connection.connect();
+            
+            this.peers.set(peerId, connection);
             this.emit('peerConnected', peerId);
+            
+        } catch (error) {
+            console.warn(`Failed to connect to peer ${peerId}:`, error);
+            setTimeout(() => {
+                this.connecting.delete(peerId);
+            }, this.reconnectDelay);
         }
     }
 
     broadcastPoll(pollData) {
-        const pollId = pollData.id;
-        this.dht.store(pollId, pollData);
+        const message = {
+            type: 'POLL',
+            data: pollData
+        };
+
+        this.broadcast(message);
+        this.dht.store(pollData.id, pollData);
+        return pollData.id;
+    }
+
+    broadcastVote(pollId, option) {
+        const message = {
+            type: 'VOTE',
+            data: { pollId, option }
+        };
+
+        this.broadcast(message);
+    }
+
+    broadcast(message) {
         this.peers.forEach(connection => {
-            connection.send(JSON.stringify({
-                type: 'POLL',
-                data: pollData
-            }));
+            connection.send(JSON.stringify(message));
         });
-        return pollId;
     }
 
     async findPoll(pollId) {
         return this.dht.get(pollId);
     }
 
+    startPeerDiscovery() {
+        setInterval(() => {
+            if (this.peers.size < this.maxPeers) {
+                this.discoverNewPeers();
+            }
+        }, 30000); // Every 30 seconds
+    }
+
+    async discoverNewPeers() {
+        const peers = await this.dht.findNode(this.dht.nodeId);
+        for (const peer of peers) {
+            if (!this.peers.has(peer.id)) {
+                this.connectToPeer(peer.id);
+            }
+        }
+    }
+
     disconnect() {
         this.peers.forEach(connection => connection.close());
         this.peers.clear();
+        this.connecting.clear();
         this.dht.cleanup();
     }
 }

@@ -55,18 +55,10 @@
     </div>
 
     <script type="module">
-        import { DHTNode } from './js/dht.js';
-        import { createPoll, addOption, copyShareUrl } from './js/poll.js';
-
-        // Initialize event listeners when DOM is loaded
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('add-option-btn').addEventListener('click', addOption);
-            document.getElementById('create-poll-btn').addEventListener('click', createPoll);
-            document.getElementById('copy-url-btn').addEventListener('click', copyShareUrl);
-        });
-
-        // Initialize DHT node
-        const dhtNode = new DHTNode();
+        import { initializeVoteMesh } from './js/script.js';
+        
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', initializeVoteMesh);
     </script>
 </body>
 </html>

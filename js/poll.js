@@ -2,23 +2,42 @@ import { PeerDiscovery } from './peer-discovery.js';
 
 const discovery = new PeerDiscovery();
 
-export function createPoll() {
-  const question = document.getElementById('question').value;
-  const options = Array.from(document.getElementsByClassName('option-input'))
-      .map(input => input.value)
-      .filter(value => value.trim() !== '');
+export class PollManager {
+    constructor(discovery) {
+        this.discovery = discovery;
+        this.polls = new Map();
+        this.activeVoters = new Set();
+        
+        // Setup poll sync interval
+        setInterval(() => this.syncPolls(), 30000);
+    }
 
-  const pollData = {
-      id: crypto.randomUUID(),
-      question,
-      options,
-      votes: Object.fromEntries(options.map(opt => [opt, 0])),
-      timestamp: Date.now()
-  };
+    createPoll(question, options) {
+        const pollId = crypto.randomUUID();
+        const poll = {
+            id: pollId,
+            question,
+            options,
+            votes: Object.fromEntries(options.map(opt => [opt, 0])),
+            timestamp: Date.now(),
+            creator: this.discovery.nodeId
+        };
 
-  discovery.broadcastPoll(pollData);
-  showPollInterface(pollData);
-  return pollData;
+        this.polls.set(pollId, poll);
+        this.discovery.broadcastPoll(poll);
+        return poll;
+    }
+
+    recordVote(pollId, option) {
+        const poll = this.polls.get(pollId);
+        if (!poll) return false;
+
+        poll.votes[option]++;
+        this.discovery.broadcastVote(pollId, option);
+        return true;
+    }
+
+    // Add methods for poll syncing and validation
 }
 
 export function addOption() {

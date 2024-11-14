@@ -1,15 +1,42 @@
 export class DHTNode {
-    constructor(nodeId) {
-        this.nodeId = nodeId;
+    constructor() {
+        this.nodeId = this.generateNodeId();
         this.routingTable = new Map();
         this.storage = new Map();
-        this.k = 20; 
-        this.maxAge = 3600000;
+        this.k = 20;
+        this.maxAge = 3600000; // 1 hour
+        this.bootstrapNodes = [
+            // Add some default bootstrap nodes
+            { id: '0x1234567890abcdef', address: 'bootstrap1.votemesh.network' },
+            { id: '0xabcdef1234567890', address: 'bootstrap2.votemesh.network' }
+        ];
         this.initialize();
     }
 
-    initialize() {
+    generateNodeId() {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async initialize() {
+        // Connect to bootstrap nodes
+        for (const node of this.bootstrapNodes) {
+            await this.connectToBootstrapNode(node);
+        }
+        
+        // Start maintenance tasks
         this.pingInterval = setInterval(() => this.pingNodes(), 60000);
+        this.cleanupInterval = setInterval(() => this.cleanup(), 300000);
+    }
+
+    async connectToBootstrapNode(node) {
+        try {
+            const peers = await this.findNode(node.id);
+            peers.forEach(peer => this.routingTable.set(peer.id, peer));
+        } catch (error) {
+            console.warn(`Failed to connect to bootstrap node ${node.id}:`, error);
+        }
     }
 
     pingNodes() {
@@ -47,5 +74,6 @@ export class DHTNode {
 
     cleanup() {
         clearInterval(this.pingInterval);
+        clearInterval(this.cleanupInterval);
     }
 }
