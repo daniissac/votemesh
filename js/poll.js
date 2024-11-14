@@ -37,30 +37,40 @@ export class PollManager {
         return true;
     }
 
-    // Add methods for poll syncing and validation
-}
+    syncPolls() {
+        // Request latest poll data from peers
+        this.discovery.broadcast({
+            type: 'SYNC_REQUEST',
+            data: {
+                polls: Array.from(this.polls.keys())
+            }
+        });
+    }
 
-export function addOption() {
-  const container = document.getElementById('options-container');
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'option-input w-full p-2 border rounded mb-2';
-  input.placeholder = `Option ${container.children.length + 1}`;
-  container.appendChild(input);
-}
+    handlePollMessage(pollData) {
+        if (!this.polls.has(pollData.id)) {
+            this.polls.set(pollData.id, pollData);
+        }
+    }
 
-export function showPollInterface(pollData) {
-  document.getElementById('creator-section').classList.add('hidden');
-  document.getElementById('voter-section').classList.remove('hidden');
-  document.getElementById('share-section').classList.remove('hidden');
-    
-  const shareUrl = `${window.location.origin}/votemesh#${pollData.id}`;
-  document.getElementById('share-url').value = shareUrl;
-}
+    handleVoteMessage(voteData) {
+        const { pollId, option } = voteData;
+        const poll = this.polls.get(pollId);
+        if (poll) {
+            poll.votes[option]++;
+        }
+    }
 
-export function copyShareUrl() {
-  const shareUrl = document.getElementById('share-url');
-  shareUrl.select();
-  document.execCommand('copy');
-  alert('Share URL copied!');
+    handleSyncMessage(syncData) {
+        syncData.polls.forEach(poll => {
+            const existingPoll = this.polls.get(poll.id);
+            if (!existingPoll || existingPoll.timestamp < poll.timestamp) {
+                this.polls.set(poll.id, poll);
+            }
+        });
+    }
+
+    getPoll(pollId) {
+        return this.polls.get(pollId);
+    }
 }
