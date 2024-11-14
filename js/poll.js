@@ -1,7 +1,5 @@
 import { PeerDiscovery } from './peer-discovery.js';
 
-const discovery = new PeerDiscovery();
-
 export class PollManager {
     constructor(discovery) {
         this.discovery = discovery;
@@ -13,15 +11,25 @@ export class PollManager {
     }
 
     createPoll(question, options) {
+        // Validate inputs
+        if (!question || !options || !Array.isArray(options) || options.length < 2) {
+            throw new Error('Invalid poll data: Question and at least 2 options are required');
+        }
+
         const pollId = crypto.randomUUID();
         const poll = {
             id: pollId,
-            question,
-            options,
-            votes: Object.fromEntries(options.map(opt => [opt, 0])),
+            question: question.trim(),
+            options: options.filter(opt => opt && opt.trim()), // Filter out empty options
+            votes: {},
             timestamp: Date.now(),
-            creator: this.discovery.nodeId
+            creator: this.discovery.dht.nodeId
         };
+
+        // Initialize vote counts
+        poll.options.forEach(opt => {
+            poll.votes[opt] = 0;
+        });
 
         this.polls.set(pollId, poll);
         this.discovery.broadcastPoll(poll);
@@ -30,7 +38,10 @@ export class PollManager {
 
     recordVote(pollId, option) {
         const poll = this.polls.get(pollId);
-        if (!poll) return false;
+        if (!poll || !poll.votes.hasOwnProperty(option)) {
+            console.warn('Invalid vote:', { pollId, option });
+            return false;
+        }
 
         poll.votes[option]++;
         this.discovery.broadcastVote(pollId, option);
@@ -56,12 +67,14 @@ export class PollManager {
     handleVoteMessage(voteData) {
         const { pollId, option } = voteData;
         const poll = this.polls.get(pollId);
-        if (poll) {
+        if (poll && poll.votes.hasOwnProperty(option)) {
             poll.votes[option]++;
         }
     }
 
     handleSyncMessage(syncData) {
+        if (!syncData || !syncData.polls) return;
+        
         syncData.polls.forEach(poll => {
             const existingPoll = this.polls.get(poll.id);
             if (!existingPoll || existingPoll.timestamp < poll.timestamp) {
@@ -72,5 +85,9 @@ export class PollManager {
 
     getPoll(pollId) {
         return this.polls.get(pollId);
+    }
+
+    getAllPolls() {
+        return Array.from(this.polls.values());
     }
 }

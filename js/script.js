@@ -63,8 +63,25 @@ function handlePeerMessage(peerId, message) {
 }
 
 // Make necessary functions available globally
-window.createPoll = (question, options) => {
-    return pollManager.createPoll(question, options);
+window.createPoll = () => {
+    const question = document.getElementById('question').value;
+    const options = Array.from(document.getElementsByClassName('option-input'))
+        .map(input => input.value.trim())
+        .filter(Boolean);
+
+    if (!question || options.length < 2) {
+        alert('Please enter a question and at least 2 options');
+        return;
+    }
+
+    try {
+        const poll = pollManager.createPoll(question, options);
+        uiManager.displayPoll(poll);
+        return poll;
+    } catch (error) {
+        console.error('Failed to create poll:', error);
+        alert('Failed to create poll. Please try again.');
+    }
 };
 
 window.addOption = () => {
