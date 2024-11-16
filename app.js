@@ -15,7 +15,7 @@ class VoteMesh {
         this.peer.on('open', (id) => {
             console.log('My peer ID is: ' + id);
             document.getElementById('peer-id').textContent = `Your ID: ${id}`;
-            document.getElementById('connection-indicator').classList.replace('bg-yellow-500', 'bg-green-500');
+            document.getElementById('connection-indicator').classList.add('connected');
             this.broadcastPresence();
         });
 
@@ -25,7 +25,7 @@ class VoteMesh {
 
         this.peer.on('error', (err) => {
             console.error('Peer error:', err);
-            document.getElementById('connection-indicator').classList.replace('bg-green-500', 'bg-red-500');
+            document.getElementById('connection-indicator').classList.add('error');
         });
     }
 
@@ -201,7 +201,7 @@ class VoteMesh {
         poll.options.forEach((option, index) => {
             // Create voting button
             const button = document.createElement('button');
-            button.className = 'w-full p-2 mb-2 bg-blue-500 hover:bg-blue-600 text-white rounded';
+            button.className = 'button button-blue';
             button.textContent = option.text;
             button.addEventListener('click', () => this.handleVote(poll.id, index, this.peer.id));
             optionsContainer.appendChild(button);
@@ -209,15 +209,14 @@ class VoteMesh {
             // Create result bar
             const percentage = totalVotes === 0 ? 0 : (option.votes / totalVotes) * 100;
             const resultBar = document.createElement('div');
-            resultBar.className = 'mb-4';
+            resultBar.className = 'result-bar';
             resultBar.innerHTML = `
-                <div class="flex justify-between mb-1">
-                    <span class="text-sm">${option.text}</span>
-                    <span class="text-sm">${option.votes} votes (${percentage.toFixed(1)}%)</span>
+                <div class="result-header">
+                    <span class="result-text">${option.text}</span>
+                    <span class="result-votes">${option.votes} votes (${percentage.toFixed(1)}%)</span>
                 </div>
-                <div class="w-full bg-gray-200 rounded">
-                    <div class="bg-blue-500 text-xs leading-none py-1 text-center text-white rounded" 
-                         style="width: ${percentage}%"></div>
+                <div class="result-bar-bg">
+                    <div class="result-bar-fill" style="width: ${percentage}%"></div>
                 </div>
             `;
             resultsContainer.appendChild(resultBar);
@@ -235,7 +234,7 @@ class VoteMesh {
 
         const input = document.createElement('input');
         input.type = 'text';
-        input.className = 'option-input w-full p-2 mb-2 border rounded';
+        input.className = 'form-input';
         input.placeholder = `Option ${optionCount + 1}`;
         input.required = true;
         
