@@ -115,7 +115,7 @@ export class UIManager {
         const shareSection = document.getElementById('share-section');
         shareSection.classList.remove('hidden');
         
-        const shareUrl = `${window.location.origin}/votemesh#${pollId}`;
+        const shareUrl = `${window.location.origin}${window.location.pathname}#${pollId}`;
         document.getElementById('share-url').value = shareUrl;
     }
 
