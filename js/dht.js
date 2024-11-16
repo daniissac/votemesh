@@ -5,7 +5,7 @@ export class DHTNode {
         this.storage = new Map();
         this.k = 20;
         this.maxAge = 3600000; // 1 hour
-        this.baseUrl = 'https://daniissac.com/votemesh/'; // Add base URL
+        this.storagePrefix = 'votemesh_poll_'; // Simplified prefix
         this.bootstrapNodes = [
             // Add some default bootstrap nodes
             { id: '0x1234567890abcdef', address: 'bootstrap1.votemesh.network' },
@@ -72,12 +72,9 @@ export class DHTNode {
         
         // Store in localStorage with proper error handling
         try {
-            const storageKey = `${this.baseUrl}:poll:${key}`;
+            const storageKey = this.storagePrefix + key;
             localStorage.setItem(storageKey, JSON.stringify(data));
             console.log('Successfully stored in localStorage:', storageKey);
-            
-            // Also store in the old format for backward compatibility
-            localStorage.setItem(`votemesh:poll:${key}`, JSON.stringify(data));
         } catch (error) {
             console.warn('Failed to store in localStorage:', error);
         }
@@ -93,14 +90,22 @@ export class DHTNode {
             return memData.value;
         }
 
-        // Try localStorage with new format
+        // Try localStorage
         try {
-            const storageKey = `${this.baseUrl}:poll:${key}`;
-            let localData = localStorage.getItem(storageKey);
-            
-            // If not found, try old format
-            if (!localData) {
-                localData = localStorage.getItem(`votemesh:poll:${key}`);
+            // Try all possible key formats
+            const possibleKeys = [
+                this.storagePrefix + key,
+                'votemesh:poll:' + key,
+                'https://daniissac.com/votemesh/:poll:' + key
+            ];
+
+            let localData = null;
+            for (const storageKey of possibleKeys) {
+                const data = localStorage.getItem(storageKey);
+                if (data) {
+                    localData = data;
+                    break;
+                }
             }
             
             if (localData) {
@@ -111,9 +116,10 @@ export class DHTNode {
                     this.storage.set(key, parsed);
                     return parsed.value;
                 } else {
-                    // Clean up expired data
-                    localStorage.removeItem(storageKey);
-                    localStorage.removeItem(`votemesh:poll:${key}`);
+                    // Clean up expired data from all formats
+                    possibleKeys.forEach(storageKey => {
+                        localStorage.removeItem(storageKey);
+                    });
                 }
             }
         } catch (error) {
@@ -127,14 +133,25 @@ export class DHTNode {
     cleanup() {
         // Clean up expired items from localStorage
         try {
-            Object.keys(localStorage)
-                .filter(key => key.startsWith('votemesh:poll:'))
-                .forEach(key => {
-                    const data = JSON.parse(localStorage.getItem(key));
-                    if (Date.now() - data.timestamp >= this.maxAge) {
+            const prefixes = [
+                this.storagePrefix,
+                'votemesh:poll:',
+                'https://daniissac.com/votemesh/:poll:'
+            ];
+
+            Object.keys(localStorage).forEach(key => {
+                if (prefixes.some(prefix => key.startsWith(prefix))) {
+                    try {
+                        const data = JSON.parse(localStorage.getItem(key));
+                        if (Date.now() - data.timestamp >= this.maxAge) {
+                            localStorage.removeItem(key);
+                        }
+                    } catch (error) {
+                        // Invalid data, remove it
                         localStorage.removeItem(key);
                     }
-                });
+                }
+            });
         } catch (error) {
             console.warn('Error during cleanup:', error);
         }

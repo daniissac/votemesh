@@ -15,10 +15,14 @@ export async function initializeVoteMesh() {
         // Set up form submission handler
         const pollForm = document.getElementById('poll-form');
         if (pollForm) {
-            pollForm.addEventListener('submit', (event) => {
+            // Remove any existing listeners
+            const newForm = pollForm.cloneNode(true);
+            pollForm.parentNode.replaceChild(newForm, pollForm);
+            
+            newForm.addEventListener('submit', (event) => {
                 event.preventDefault();
-                createPoll();
-            });
+                window.createPoll(event);
+            }, { once: true }); // Ensure it only fires once
         }
 
         // Set up network event handlers
@@ -116,6 +120,11 @@ window.createPoll = (event) => {
         const poll = pollManager.createPoll(question, options);
         uiManager.displayPoll(poll);
         uiManager.showShareSection(poll.id);
+        
+        // Clear the form
+        document.getElementById('question').value = '';
+        document.getElementsByClassName('option-input').forEach(input => input.value = '');
+        
         return poll;
     } catch (error) {
         console.error('Failed to create poll:', error);

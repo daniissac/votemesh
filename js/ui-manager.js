@@ -5,21 +5,6 @@ export class UIManager {
     }
 
     setupEventListeners() {
-        // Poll creation
-        const pollForm = document.getElementById('poll-form');
-        if (pollForm) {
-            pollForm.addEventListener('submit', (event) => {
-                event.preventDefault();
-                this.handlePollCreation();
-            });
-        }
-
-        // Add option button
-        const addOptionBtn = document.getElementById('add-option-btn');
-        if (addOptionBtn) {
-            addOptionBtn.addEventListener('click', () => this.addOption());
-        }
-
         // Copy share URL button
         const copyUrlBtn = document.getElementById('copy-url-btn');
         if (copyUrlBtn) {
