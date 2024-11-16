@@ -90,7 +90,9 @@ function handlePeerMessage(peerId, message) {
 }
 
 // Make necessary functions available globally
-window.createPoll = () => {
+window.createPoll = (event) => {
+    if (event) event.preventDefault();
+    
     const question = document.getElementById('question').value;
     const options = Array.from(document.getElementsByClassName('option-input'))
         .map(input => input.value.trim())
@@ -104,6 +106,7 @@ window.createPoll = () => {
     try {
         const poll = pollManager.createPoll(question, options);
         uiManager.displayPoll(poll);
+        uiManager.showShareSection(poll.id);
         return poll;
     } catch (error) {
         console.error('Failed to create poll:', error);

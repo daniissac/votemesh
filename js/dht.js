@@ -59,20 +59,24 @@ export class DHTNode {
 
     store(key, value) {
         console.log('DHT storing data for key:', key);
-        // Store in local storage as well for persistence
+        
+        // Ensure the value is properly structured
+        const data = {
+            value,
+            timestamp: Date.now()
+        };
+        
+        // Store in memory
+        this.storage.set(key, data);
+        
+        // Store in localStorage with proper error handling
         try {
-            localStorage.setItem(`dht:${key}`, JSON.stringify({
-                value,
-                timestamp: Date.now()
-            }));
+            const storageKey = `votemesh:poll:${key}`;
+            localStorage.setItem(storageKey, JSON.stringify(data));
+            console.log('Successfully stored in localStorage:', storageKey);
         } catch (error) {
             console.warn('Failed to store in localStorage:', error);
         }
-        
-        this.storage.set(key, {
-            value,
-            timestamp: Date.now()
-        });
     }
 
     get(key) {
@@ -87,25 +91,50 @@ export class DHTNode {
 
         // Try localStorage
         try {
-            const localData = localStorage.getItem(`dht:${key}`);
+            const storageKey = `votemesh:poll:${key}`;
+            const localData = localStorage.getItem(storageKey);
             if (localData) {
                 const parsed = JSON.parse(localData);
                 if (Date.now() - parsed.timestamp < this.maxAge) {
                     console.log('Found in localStorage:', parsed.value);
-                    // Update memory
+                    // Update memory cache
                     this.storage.set(key, parsed);
                     return parsed.value;
+                } else {
+                    // Clean up expired data
+                    localStorage.removeItem(storageKey);
                 }
             }
         } catch (error) {
             console.warn('Failed to retrieve from localStorage:', error);
         }
 
-        console.log('Data not found in DHT');
+        console.log('Data not found in DHT for key:', key);
         return null;
     }
 
     cleanup() {
+        // Clean up expired items from localStorage
+        try {
+            Object.keys(localStorage)
+                .filter(key => key.startsWith('votemesh:poll:'))
+                .forEach(key => {
+                    const data = JSON.parse(localStorage.getItem(key));
+                    if (Date.now() - data.timestamp >= this.maxAge) {
+                        localStorage.removeItem(key);
+                    }
+                });
+        } catch (error) {
+            console.warn('Error during cleanup:', error);
+        }
+        
+        // Clean up memory storage
+        this.storage.forEach((data, key) => {
+            if (Date.now() - data.timestamp >= this.maxAge) {
+                this.storage.delete(key);
+            }
+        });
+
         clearInterval(this.pingInterval);
         clearInterval(this.cleanupInterval);
     }
