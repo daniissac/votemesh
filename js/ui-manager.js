@@ -115,7 +115,9 @@ export class UIManager {
         const shareSection = document.getElementById('share-section');
         shareSection.classList.remove('hidden');
         
-        const shareUrl = `${window.location.origin}${window.location.pathname}#${pollId}`;
+        // Get the base URL of the website
+        const baseUrl = 'https://daniissac.com/votemesh/';
+        const shareUrl = `${baseUrl}#${pollId}`;
         document.getElementById('share-url').value = shareUrl;
     }
 
