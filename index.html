@@ -12,17 +12,17 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1 class="text-4xl font-bold text-green-600">VoteMesh</h1>
-            <p class="text-gray-600">Decentralized P2P Polling</p>
+            <h1>VoteMesh</h1>
+            <p>Decentralized P2P Polling</p>
         </div>
 
         <!-- Network Status -->
         <div id="network-status" class="network-status">
             <div class="network-header">
                 <div class="network-info">
-                    <h3 class="text-lg font-semibold">Network Status</h3>
-                    <p id="peer-count" class="text-sm text-gray-600">Connected Peers: 0</p>
-                    <p id="peer-id" class="text-sm text-gray-600">Your ID: Connecting...</p>
+                    <h3>Network Status</h3>
+                    <p id="peer-count">Connected Peers: 0</p>
+                    <p id="peer-id">Your ID: Connecting...</p>
                 </div>
                 <div id="connection-indicator" class="connection-indicator"></div>
             </div>
@@ -30,7 +30,7 @@
 
         <!-- Poll Creation -->
         <div id="creator-section" class="card">
-            <h2 class="text-xl font-semibold mb-4">Create New Poll</h2>
+            <h2>Create New Poll</h2>
             <form id="poll-form" class="space-y-4">
                 <div class="form-group">
                     <label for="question" class="form-label">Question</label>
@@ -67,14 +67,14 @@
 
         <!-- Active Poll -->
         <div id="voter-section" class="card hidden">
-            <h2 id="poll-question" class="text-xl font-semibold mb-4"></h2>
-            <div id="poll-options" class="space-y-2 mb-6"></div>
+            <h2 id="poll-question"></h2>
+            <div id="poll-options" class="space-y-2"></div>
             <div id="results" class="space-y-2"></div>
         </div>
 
         <!-- Share Section -->
         <div id="share-section" class="card hidden">
-            <h3 class="text-lg font-semibold mb-2">Share Poll</h3>
+            <h3>Share Poll</h3>
             <div class="share-group">
                 <input type="text" 
                        id="share-url" 
