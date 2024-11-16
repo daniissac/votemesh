@@ -62,12 +62,14 @@ export class PeerDiscovery extends EventEmitter {
     }
 
     broadcastPoll(pollData) {
+        console.log('Broadcasting poll to peers:', pollData.id);
         const message = {
             type: 'POLL',
             data: pollData
         };
 
         this.broadcast(message);
+        console.log('Storing poll in DHT:', pollData.id);
         this.dht.store(pollData.id, pollData);
         return pollData.id;
     }
@@ -88,7 +90,10 @@ export class PeerDiscovery extends EventEmitter {
     }
 
     async findPoll(pollId) {
-        return this.dht.get(pollId);
+        console.log('Searching for poll in DHT:', pollId);
+        const poll = await this.dht.get(pollId);
+        console.log('DHT search result:', poll);
+        return poll;
     }
 
     startPeerDiscovery() {

@@ -17,6 +17,8 @@ export class PollManager {
         }
 
         const pollId = crypto.randomUUID();
+        console.log('Creating new poll with ID:', pollId);
+        
         const poll = {
             id: pollId,
             question: question.trim(),
@@ -31,7 +33,10 @@ export class PollManager {
             poll.votes[opt] = 0;
         });
 
+        console.log('Storing poll in local Map:', poll);
         this.polls.set(pollId, poll);
+        
+        console.log('Broadcasting poll to network');
         this.discovery.broadcastPoll(poll);
         return poll;
     }
@@ -59,7 +64,9 @@ export class PollManager {
     }
 
     handlePollMessage(pollData) {
+        console.log('Received poll message:', pollData);
         if (!this.polls.has(pollData.id)) {
+            console.log('Storing new poll from network:', pollData.id);
             this.polls.set(pollData.id, pollData);
         }
     }
@@ -84,7 +91,10 @@ export class PollManager {
     }
 
     getPoll(pollId) {
-        return this.polls.get(pollId);
+        console.log('Getting poll:', pollId);
+        const poll = this.polls.get(pollId);
+        console.log('Poll found:', poll);
+        return poll;
     }
 
     getAllPolls() {

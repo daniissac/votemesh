@@ -58,6 +58,17 @@ export class DHTNode {
     }
 
     store(key, value) {
+        console.log('DHT storing data for key:', key);
+        // Store in local storage as well for persistence
+        try {
+            localStorage.setItem(`dht:${key}`, JSON.stringify({
+                value,
+                timestamp: Date.now()
+            }));
+        } catch (error) {
+            console.warn('Failed to store in localStorage:', error);
+        }
+        
         this.storage.set(key, {
             value,
             timestamp: Date.now()
@@ -65,10 +76,32 @@ export class DHTNode {
     }
 
     get(key) {
-        const data = this.storage.get(key);
-        if (data && Date.now() - data.timestamp < this.maxAge) {
-            return data.value;
+        console.log('DHT retrieving data for key:', key);
+        
+        // Try memory first
+        const memData = this.storage.get(key);
+        if (memData && Date.now() - memData.timestamp < this.maxAge) {
+            console.log('Found in memory:', memData.value);
+            return memData.value;
         }
+
+        // Try localStorage
+        try {
+            const localData = localStorage.getItem(`dht:${key}`);
+            if (localData) {
+                const parsed = JSON.parse(localData);
+                if (Date.now() - parsed.timestamp < this.maxAge) {
+                    console.log('Found in localStorage:', parsed.value);
+                    // Update memory
+                    this.storage.set(key, parsed);
+                    return parsed.value;
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to retrieve from localStorage:', error);
+        }
+
+        console.log('Data not found in DHT');
         return null;
     }
 
