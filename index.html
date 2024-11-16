@@ -20,7 +20,7 @@
             <p id="dht-status" class="text-sm text-gray-600">DHT Status: Initializing...</p>
         </div>
         <div id="creator-section" class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <form id="poll-form">
+            <form id="poll-form" class="poll-form" onsubmit="return false;">
                 <h2 class="text-xl font-semibold mb-4">Create Poll</h2>
                 <input type="text" 
                         id="question" 
@@ -37,8 +37,8 @@
                         <input type="text" class="option-input w-full p-2 border rounded" placeholder="Option 2" required>
                     </div>
                 </div>
-                <button type="button" onclick="addOption()" class="bg-gray-200 px-4 py-2 rounded mr-2">Add Option</button>
-                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded">Create Poll</button>
+                <button type="button" id="add-option-btn" class="bg-gray-200 px-4 py-2 rounded mr-2">Add Option</button>
+                <button type="submit" id="create-poll-btn" class="bg-green-500 text-white px-4 py-2 rounded">Create Poll</button>
             </form>
         </div>
         <div id="voter-section" class="bg-white rounded-lg shadow-lg p-6 hidden">

@@ -12,41 +12,6 @@ export class UIManager {
         }
     }
 
-    handlePollCreation() {
-        const question = document.getElementById('question').value;
-        const options = Array.from(document.getElementsByClassName('option-input'))
-            .map(input => input.value.trim())
-            .filter(Boolean);
-
-        if (question && options.length >= 2) {
-            const poll = this.pollManager.createPoll(question, options);
-            this.displayPoll(poll);
-            this.showShareSection(poll.id);
-        }
-    }
-
-    addOption() {
-        const container = document.getElementById('options-container');
-        const optionWrapper = document.createElement('div');
-        optionWrapper.className = 'flex gap-2 mb-2';
-        
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'option-input w-full p-2 border rounded';
-        input.placeholder = `Option ${container.children.length + 1}`;
-        input.required = true;
-        
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'bg-red-500 text-white px-3 rounded hover:bg-red-600';
-        removeBtn.textContent = '×';
-        removeBtn.onclick = () => optionWrapper.remove();
-        
-        optionWrapper.appendChild(input);
-        optionWrapper.appendChild(removeBtn);
-        container.appendChild(optionWrapper);
-    }
-
     displayPoll(poll) {
         document.getElementById('creator-section').classList.add('hidden');
         document.getElementById('voter-section').classList.remove('hidden');
@@ -100,7 +65,6 @@ export class UIManager {
         const shareSection = document.getElementById('share-section');
         shareSection.classList.remove('hidden');
         
-        // Get the base URL of the website
         const baseUrl = 'https://daniissac.com/votemesh/';
         const shareUrl = `${baseUrl}#${pollId}`;
         document.getElementById('share-url').value = shareUrl;
@@ -117,4 +81,4 @@ export class UIManager {
         document.getElementById('peer-count').textContent = `Connected Peers: ${peerCount}`;
         document.getElementById('dht-status').textContent = `DHT Status: ${status}`;
     }
-} 
+}

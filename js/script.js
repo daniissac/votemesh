@@ -4,6 +4,7 @@ import { PollManager } from './poll.js';
 import { UIManager } from './ui-manager.js';
 
 let discovery, pollManager, uiManager;
+let formSubmitting = false;
 
 export async function initializeVoteMesh() {
     try {
@@ -14,15 +15,33 @@ export async function initializeVoteMesh() {
 
         // Set up form submission handler
         const pollForm = document.getElementById('poll-form');
+        const addOptionBtn = document.getElementById('add-option-btn');
+        
         if (pollForm) {
             // Remove any existing listeners
             const newForm = pollForm.cloneNode(true);
             pollForm.parentNode.replaceChild(newForm, pollForm);
             
-            newForm.addEventListener('submit', (event) => {
+            // Set up the form submission handler
+            newForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
-                window.createPoll(event);
-            }, { once: true }); // Ensure it only fires once
+                event.stopPropagation();
+                
+                if (formSubmitting) return; // Prevent double submission
+                formSubmitting = true;
+                
+                try {
+                    await window.createPoll();
+                } finally {
+                    formSubmitting = false;
+                }
+            });
+            
+            // Set up add option button
+            const newAddOptionBtn = newForm.querySelector('#add-option-btn');
+            if (newAddOptionBtn) {
+                newAddOptionBtn.addEventListener('click', window.addOption);
+            }
         }
 
         // Set up network event handlers
@@ -103,9 +122,7 @@ function handlePeerMessage(peerId, message) {
 }
 
 // Make necessary functions available globally
-window.createPoll = (event) => {
-    if (event) event.preventDefault();
-    
+window.createPoll = async () => {
     const question = document.getElementById('question').value;
     const options = Array.from(document.getElementsByClassName('option-input'))
         .map(input => input.value.trim())
@@ -123,7 +140,9 @@ window.createPoll = (event) => {
         
         // Clear the form
         document.getElementById('question').value = '';
-        document.getElementsByClassName('option-input').forEach(input => input.value = '');
+        Array.from(document.getElementsByClassName('option-input')).forEach(input => {
+            input.value = '';
+        });
         
         return poll;
     } catch (error) {
@@ -133,7 +152,27 @@ window.createPoll = (event) => {
 };
 
 window.addOption = () => {
-    uiManager.addOption();
+    const container = document.getElementById('options-container');
+    const optionCount = container.children.length + 1;
+    
+    const optionWrapper = document.createElement('div');
+    optionWrapper.className = 'flex gap-2 mb-2';
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'option-input w-full p-2 border rounded';
+    input.placeholder = `Option ${optionCount}`;
+    input.required = true;
+    
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'bg-red-500 text-white px-3 rounded hover:bg-red-600';
+    removeBtn.textContent = '×';
+    removeBtn.onclick = () => optionWrapper.remove();
+    
+    optionWrapper.appendChild(input);
+    optionWrapper.appendChild(removeBtn);
+    container.appendChild(optionWrapper);
 };
 
 window.copyShareUrl = () => {
