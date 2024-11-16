@@ -5,60 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VoteMesh - P2P Polling</title>
     <link rel="icon" type="image/svg+xml" href="votemesh-icon.svg">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles.css">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
+<body>
+    <div class="container">
         <!-- Header -->
-        <div class="text-center mb-8">
+        <div class="header">
             <h1 class="text-4xl font-bold text-green-600">VoteMesh</h1>
             <p class="text-gray-600">Decentralized P2P Polling</p>
         </div>
 
         <!-- Network Status -->
-        <div id="network-status" class="bg-white rounded-lg shadow p-4 mb-6">
-            <div class="flex items-center justify-between">
-                <div>
+        <div id="network-status" class="network-status">
+            <div class="network-header">
+                <div class="network-info">
                     <h3 class="text-lg font-semibold">Network Status</h3>
                     <p id="peer-count" class="text-sm text-gray-600">Connected Peers: 0</p>
                     <p id="peer-id" class="text-sm text-gray-600">Your ID: Connecting...</p>
                 </div>
-                <div id="connection-indicator" class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div id="connection-indicator" class="connection-indicator"></div>
             </div>
         </div>
 
         <!-- Poll Creation -->
-        <div id="creator-section" class="bg-white rounded-lg shadow p-6 mb-6">
+        <div id="creator-section" class="card">
             <h2 class="text-xl font-semibold mb-4">Create New Poll</h2>
             <form id="poll-form" class="space-y-4">
-                <div>
-                    <label for="question" class="block text-sm font-medium text-gray-700">Question</label>
+                <div class="form-group">
+                    <label for="question" class="form-label">Question</label>
                     <input type="text" 
                            id="question" 
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                           class="form-input"
                            placeholder="What's your question?"
                            required>
                 </div>
                 
                 <div id="options-container" class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-700">Options</label>
+                    <label class="form-label">Options</label>
                     <div class="option-input-group">
-                        <input type="text" class="option-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500" placeholder="Option 1" required>
+                        <input type="text" class="form-input" placeholder="Option 1" required>
                     </div>
                     <div class="option-input-group">
-                        <input type="text" class="option-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500" placeholder="Option 2" required>
+                        <input type="text" class="form-input" placeholder="Option 2" required>
                     </div>
                 </div>
 
-                <div class="flex gap-2">
+                <div class="button-group">
                     <button type="button" 
                             id="add-option-btn"
-                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            class="button button-secondary">
                         Add Option
                     </button>
                     <button type="submit"
-                            class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+                            class="button button-primary">
                         Create Poll
                     </button>
                 </div>
@@ -66,22 +66,22 @@
         </div>
 
         <!-- Active Poll -->
-        <div id="voter-section" class="bg-white rounded-lg shadow p-6 mb-6 hidden">
+        <div id="voter-section" class="card hidden">
             <h2 id="poll-question" class="text-xl font-semibold mb-4"></h2>
             <div id="poll-options" class="space-y-2 mb-6"></div>
             <div id="results" class="space-y-2"></div>
         </div>
 
         <!-- Share Section -->
-        <div id="share-section" class="bg-white rounded-lg shadow p-6 hidden">
+        <div id="share-section" class="card hidden">
             <h3 class="text-lg font-semibold mb-2">Share Poll</h3>
-            <div class="flex gap-2">
+            <div class="share-group">
                 <input type="text" 
                        id="share-url" 
-                       class="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                       class="form-input share-input"
                        readonly>
                 <button id="copy-url-btn"
-                        class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                        class="button button-blue">
                     Copy Link
                 </button>
             </div>
