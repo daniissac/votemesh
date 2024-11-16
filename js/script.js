@@ -12,6 +12,15 @@ export async function initializeVoteMesh() {
         pollManager = new PollManager(discovery);
         uiManager = new UIManager(pollManager);
 
+        // Set up form submission handler
+        const pollForm = document.getElementById('poll-form');
+        if (pollForm) {
+            pollForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                createPoll();
+            });
+        }
+
         // Set up network event handlers
         discovery.on('peerConnected', (peerId) => {
             uiManager.updateNetworkStatus(discovery.peers.size, 'Connected');

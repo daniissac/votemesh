@@ -5,6 +5,7 @@ export class DHTNode {
         this.storage = new Map();
         this.k = 20;
         this.maxAge = 3600000; // 1 hour
+        this.baseUrl = 'https://daniissac.com/votemesh/'; // Add base URL
         this.bootstrapNodes = [
             // Add some default bootstrap nodes
             { id: '0x1234567890abcdef', address: 'bootstrap1.votemesh.network' },
@@ -71,9 +72,12 @@ export class DHTNode {
         
         // Store in localStorage with proper error handling
         try {
-            const storageKey = `votemesh:poll:${key}`;
+            const storageKey = `${this.baseUrl}:poll:${key}`;
             localStorage.setItem(storageKey, JSON.stringify(data));
             console.log('Successfully stored in localStorage:', storageKey);
+            
+            // Also store in the old format for backward compatibility
+            localStorage.setItem(`votemesh:poll:${key}`, JSON.stringify(data));
         } catch (error) {
             console.warn('Failed to store in localStorage:', error);
         }
@@ -89,10 +93,16 @@ export class DHTNode {
             return memData.value;
         }
 
-        // Try localStorage
+        // Try localStorage with new format
         try {
-            const storageKey = `votemesh:poll:${key}`;
-            const localData = localStorage.getItem(storageKey);
+            const storageKey = `${this.baseUrl}:poll:${key}`;
+            let localData = localStorage.getItem(storageKey);
+            
+            // If not found, try old format
+            if (!localData) {
+                localData = localStorage.getItem(`votemesh:poll:${key}`);
+            }
+            
             if (localData) {
                 const parsed = JSON.parse(localData);
                 if (Date.now() - parsed.timestamp < this.maxAge) {
@@ -103,6 +113,7 @@ export class DHTNode {
                 } else {
                     // Clean up expired data
                     localStorage.removeItem(storageKey);
+                    localStorage.removeItem(`votemesh:poll:${key}`);
                 }
             }
         } catch (error) {
