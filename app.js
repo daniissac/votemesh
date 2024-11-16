@@ -2,6 +2,7 @@
 let peer = null;
 let connections = new Set();
 let localPolls = new Map();
+let activePollId = null; // Track the active poll ID
 
 // DOM Elements
 const networkStatus = {
@@ -55,11 +56,14 @@ function handleIncomingConnection(conn) {
 }
 
 function connectToPeer(peerId) {
+    if (peerId === peer.id) return; // Don't connect to self
+    
     const conn = peer.connect(peerId);
     
     conn.on('open', () => {
         connections.add(conn);
         updatePeerCount();
+        activePollId = peerId; // Set active poll to creator's ID
         
         // Request poll data if we're joining as a voter
         conn.send({ type: 'request_poll' });
@@ -78,6 +82,8 @@ function updatePeerCount() {
 
 // Data Handling
 function handleIncomingData(conn, data) {
+    console.log('Received data:', data); // Debug log
+    
     switch (data.type) {
         case 'request_poll':
             if (localPolls.has(peer.id)) {
@@ -89,10 +95,14 @@ function handleIncomingData(conn, data) {
             break;
             
         case 'poll_data':
+            console.log('Received poll data:', data.poll); // Debug log
+            localPolls.set(data.poll.id, data.poll);
+            activePollId = data.poll.id;
             displayPoll(data.poll);
             break;
             
         case 'vote':
+            console.log('Received vote:', data); // Debug log
             handleVote(data.option);
             broadcastToOtherPeers(conn, data);
             break;
@@ -119,6 +129,7 @@ function createPoll(question, options) {
     };
     
     localPolls.set(peer.id, poll);
+    activePollId = peer.id;
     displayPoll(poll);
     updateShareUrl();
     
@@ -182,8 +193,11 @@ function displayResults(poll) {
 
 // Vote Handling
 function submitVote(optionIndex) {
-    const poll = localPolls.get(peer.id);
-    if (!poll) return;
+    const poll = localPolls.get(activePollId);
+    if (!poll) {
+        console.error('No active poll found'); // Debug log
+        return;
+    }
     
     handleVote(optionIndex);
     
@@ -197,8 +211,11 @@ function submitVote(optionIndex) {
 }
 
 function handleVote(optionIndex) {
-    const poll = localPolls.get(peer.id);
-    if (!poll || !poll.options[optionIndex]) return;
+    const poll = localPolls.get(activePollId);
+    if (!poll || !poll.options[optionIndex]) {
+        console.error('Invalid poll or option index:', { activePollId, optionIndex, poll }); // Debug log
+        return;
+    }
     
     poll.options[optionIndex].votes++;
     displayResults(poll);
