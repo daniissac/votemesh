@@ -1,310 +1,267 @@
-class VoteMesh {
-    constructor() {
-        this.peers = new Map();
-        this.polls = new Map();
-        this.initializePeer();
-        this.setupEventListeners();
-        this.loadPolls();
-        this.initializeFromUrl();
-    }
+// P2P Connection Management
+let peer = null;
+let connections = new Set();
+let localPolls = new Map();
 
-    initializePeer() {
-        // Initialize PeerJS with random ID
-        this.peer = new Peer(this.generateId());
+// DOM Elements
+const networkStatus = {
+    peerCount: document.getElementById('peer-count'),
+    peerId: document.getElementById('peer-id'),
+    indicator: document.getElementById('connection-indicator')
+};
+
+const sections = {
+    creator: document.getElementById('creator-section'),
+    voter: document.getElementById('voter-section'),
+    share: document.getElementById('share-section')
+};
+
+const pollForm = document.getElementById('poll-form');
+const addOptionBtn = document.getElementById('add-option-btn');
+const pollOptions = document.getElementById('poll-options');
+const results = document.getElementById('results');
+const shareUrl = document.getElementById('share-url');
+const copyUrlBtn = document.getElementById('copy-url-btn');
+
+// Initialize P2P Connection
+function initializePeer() {
+    peer = new Peer();
+    
+    peer.on('open', id => {
+        networkStatus.peerId.textContent = `Your ID: ${id}`;
+        networkStatus.indicator.classList.add('connected');
+        loadPollFromUrl();
+    });
+
+    peer.on('connection', handleIncomingConnection);
+    
+    peer.on('error', error => {
+        console.error('Peer connection error:', error);
+        networkStatus.indicator.classList.remove('connected');
+        networkStatus.indicator.classList.add('error');
+    });
+}
+
+// Connection Handling
+function handleIncomingConnection(conn) {
+    connections.add(conn);
+    updatePeerCount();
+    
+    conn.on('data', data => handleIncomingData(conn, data));
+    conn.on('close', () => {
+        connections.delete(conn);
+        updatePeerCount();
+    });
+}
+
+function connectToPeer(peerId) {
+    const conn = peer.connect(peerId);
+    
+    conn.on('open', () => {
+        connections.add(conn);
+        updatePeerCount();
         
-        this.peer.on('open', (id) => {
-            console.log('My peer ID is: ' + id);
-            document.getElementById('peer-id').textContent = `Your ID: ${id}`;
-            document.getElementById('connection-indicator').classList.add('connected');
-            this.broadcastPresence();
-        });
+        // Request poll data if we're joining as a voter
+        conn.send({ type: 'request_poll' });
+    });
+    
+    conn.on('data', data => handleIncomingData(conn, data));
+    conn.on('close', () => {
+        connections.delete(conn);
+        updatePeerCount();
+    });
+}
 
-        this.peer.on('connection', (conn) => {
-            this.setupConnection(conn);
-        });
+function updatePeerCount() {
+    networkStatus.peerCount.textContent = `Connected Peers: ${connections.size}`;
+}
 
-        this.peer.on('error', (err) => {
-            console.error('Peer error:', err);
-            document.getElementById('connection-indicator').classList.add('error');
-        });
-    }
-
-    setupConnection(conn) {
-        conn.on('open', () => {
-            this.peers.set(conn.peer, conn);
-            this.updatePeerCount();
-            
-            // Send all known polls to the new peer
-            this.polls.forEach(poll => {
+// Data Handling
+function handleIncomingData(conn, data) {
+    switch (data.type) {
+        case 'request_poll':
+            if (localPolls.has(peer.id)) {
                 conn.send({
-                    type: 'poll_state',
-                    poll: poll
+                    type: 'poll_data',
+                    poll: localPolls.get(peer.id)
                 });
-            });
-        });
-
-        conn.on('data', (data) => {
-            this.handlePeerMessage(data, conn.peer);
-        });
-
-        conn.on('close', () => {
-            this.peers.delete(conn.peer);
-            this.updatePeerCount();
-        });
-    }
-
-    handlePeerMessage(data, fromPeerId) {
-        switch (data.type) {
-            case 'presence':
-                if (!this.peers.has(fromPeerId)) {
-                    this.connectToPeer(fromPeerId);
-                }
-                break;
-
-            case 'poll_state':
-                this.updatePollState(data.poll);
-                break;
-
-            case 'vote':
-                this.handleVote(data.pollId, data.optionIndex, fromPeerId);
-                break;
-        }
-    }
-
-    broadcastPresence() {
-        // Broadcast presence through localStorage
-        const presence = {
-            peerId: this.peer.id,
-            timestamp: Date.now()
-        };
-        localStorage.setItem('votemesh_presence', JSON.stringify(presence));
-        
-        // Listen for other peers
-        window.addEventListener('storage', (e) => {
-            if (e.key === 'votemesh_presence') {
-                const presence = JSON.parse(e.newValue);
-                if (presence.peerId !== this.peer.id) {
-                    this.connectToPeer(presence.peerId);
-                }
             }
-        });
-    }
-
-    connectToPeer(peerId) {
-        if (!this.peers.has(peerId)) {
-            const conn = this.peer.connect(peerId);
-            this.setupConnection(conn);
-        }
-    }
-
-    setupEventListeners() {
-        // Poll creation form
-        const pollForm = document.getElementById('poll-form');
-        pollForm.addEventListener('submit', (e) => this.handlePollCreation(e));
-
-        // Add option button
-        const addOptionBtn = document.getElementById('add-option-btn');
-        addOptionBtn.addEventListener('click', () => this.addOptionInput());
-
-        // Copy URL button
-        const copyUrlBtn = document.getElementById('copy-url-btn');
-        copyUrlBtn.addEventListener('click', () => this.copyPollUrl());
-    }
-
-    async handlePollCreation(e) {
-        e.preventDefault();
-
-        const question = document.getElementById('question').value;
-        const optionInputs = document.querySelectorAll('.option-input');
-        const options = Array.from(optionInputs).map(input => ({
-            text: input.value,
-            votes: 0
-        }));
-
-        const poll = {
-            id: this.generateId(),
-            question,
-            options,
-            created: Date.now(),
-            votes: {} // Track who voted for what
-        };
-
-        this.updatePollState(poll);
-        this.broadcastPoll(poll);
-
-        // Update URL and UI
-        window.history.pushState({}, '', `#${poll.id}`);
-        this.showPoll(poll);
-        this.updateShareUrl(poll.id);
-    }
-
-    handleVote(pollId, optionIndex, voterId) {
-        const poll = this.polls.get(pollId);
-        if (!poll) return;
-
-        // Check if user already voted
-        if (poll.votes[voterId] !== undefined) {
-            const previousVote = poll.votes[voterId];
-            poll.options[previousVote].votes--;
-        }
-
-        // Record new vote
-        poll.votes[voterId] = optionIndex;
-        poll.options[optionIndex].votes++;
-
-        // Update local state and storage
-        this.updatePollState(poll);
-        
-        // Broadcast vote to peers
-        this.broadcastToPeers({
-            type: 'vote',
-            pollId,
-            optionIndex
-        });
-
-        // Update display
-        this.updatePollDisplay(poll);
-    }
-
-    updatePollState(poll) {
-        this.polls.set(poll.id, poll);
-        this.savePollToStorage(poll);
-        this.updatePollDisplay(poll);
-    }
-
-    broadcastPoll(poll) {
-        this.broadcastToPeers({
-            type: 'poll_state',
-            poll: poll
-        });
-    }
-
-    broadcastToPeers(message) {
-        this.peers.forEach(conn => {
-            if (conn.open) {
-                conn.send(message);
-            }
-        });
-    }
-
-    updatePollDisplay(poll) {
-        document.getElementById('poll-question').textContent = poll.question;
-
-        const optionsContainer = document.getElementById('poll-options');
-        const resultsContainer = document.getElementById('results');
-        
-        optionsContainer.innerHTML = '';
-        resultsContainer.innerHTML = '';
-
-        const totalVotes = poll.options.reduce((sum, opt) => sum + opt.votes, 0);
-
-        poll.options.forEach((option, index) => {
-            // Create voting button
-            const button = document.createElement('button');
-            button.className = 'button button-blue';
-            button.textContent = option.text;
-            button.addEventListener('click', () => this.handleVote(poll.id, index, this.peer.id));
-            optionsContainer.appendChild(button);
-
-            // Create result bar
-            const percentage = totalVotes === 0 ? 0 : (option.votes / totalVotes) * 100;
-            const resultBar = document.createElement('div');
-            resultBar.className = 'result-bar';
-            resultBar.innerHTML = `
-                <div class="result-header">
-                    <span class="result-text">${option.text}</span>
-                    <span class="result-votes">${option.votes} votes (${percentage.toFixed(1)}%)</span>
-                </div>
-                <div class="result-bar-bg">
-                    <div class="result-bar-fill" style="width: ${percentage}%"></div>
-                </div>
-            `;
-            resultsContainer.appendChild(resultBar);
-        });
-    }
-
-    addOptionInput() {
-        const optionsContainer = document.getElementById('options-container');
-        const optionCount = optionsContainer.children.length;
-        
-        if (optionCount >= 10) {
-            alert('Maximum 10 options allowed');
-            return;
-        }
-
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'form-input';
-        input.placeholder = `Option ${optionCount + 1}`;
-        input.required = true;
-        
-        optionsContainer.appendChild(input);
-    }
-
-    copyPollUrl() {
-        const url = document.getElementById('share-url').value;
-        navigator.clipboard.writeText(url).then(() => {
-            const copyBtn = document.getElementById('copy-url-btn');
-            const originalText = copyBtn.textContent;
-            copyBtn.textContent = 'Copied!';
-            setTimeout(() => copyBtn.textContent = originalText, 2000);
-        });
-    }
-
-    updateShareUrl(pollId) {
-        const shareUrl = `${window.location.origin}${window.location.pathname}#${pollId}`;
-        document.getElementById('share-url').value = shareUrl;
-        document.getElementById('share-section').classList.remove('hidden');
-    }
-
-    updatePeerCount() {
-        document.getElementById('peer-count').textContent = `Connected Peers: ${this.peers.size}`;
-    }
-
-    generateId() {
-        return Math.random().toString(36).substr(2, 9);
-    }
-
-    savePollToStorage(poll) {
-        try {
-            const polls = JSON.parse(localStorage.getItem('votemesh_polls') || '{}');
-            polls[poll.id] = poll;
-            localStorage.setItem('votemesh_polls', JSON.stringify(polls));
-        } catch (err) {
-            console.error('Error saving poll to storage:', err);
-        }
-    }
-
-    loadPolls() {
-        try {
-            const polls = JSON.parse(localStorage.getItem('votemesh_polls') || '{}');
-            Object.values(polls).forEach(poll => {
-                this.polls.set(poll.id, poll);
-            });
-        } catch (err) {
-            console.error('Error loading polls from storage:', err);
-        }
-    }
-
-    initializeFromUrl() {
-        const pollId = window.location.hash.slice(1);
-        if (pollId) {
-            const poll = this.polls.get(pollId);
-            if (poll) {
-                this.showPoll(poll);
-                this.updateShareUrl(pollId);
-            }
-        }
-    }
-
-    showPoll(poll) {
-        document.getElementById('creator-section').classList.add('hidden');
-        document.getElementById('voter-section').classList.remove('hidden');
-        this.updatePollDisplay(poll);
+            break;
+            
+        case 'poll_data':
+            displayPoll(data.poll);
+            break;
+            
+        case 'vote':
+            handleVote(data.option);
+            broadcastToOtherPeers(conn, data);
+            break;
     }
 }
 
-// Initialize app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    window.app = new VoteMesh();
+function broadcastToOtherPeers(sourceConn, data) {
+    for (const conn of connections) {
+        if (conn !== sourceConn) {
+            conn.send(data);
+        }
+    }
+}
+
+// Poll Creation
+function createPoll(question, options) {
+    const poll = {
+        id: peer.id,
+        question,
+        options: options.map(text => ({
+            text,
+            votes: 0
+        }))
+    };
+    
+    localPolls.set(peer.id, poll);
+    displayPoll(poll);
+    updateShareUrl();
+    
+    // Broadcast poll to connected peers
+    for (const conn of connections) {
+        conn.send({
+            type: 'poll_data',
+            poll
+        });
+    }
+}
+
+// Poll Display
+function displayPoll(poll) {
+    sections.creator.classList.add('hidden');
+    sections.voter.classList.remove('hidden');
+    sections.share.classList.remove('hidden');
+    
+    document.getElementById('poll-question').textContent = poll.question;
+    
+    // Display options and results
+    displayPollOptions(poll);
+    displayResults(poll);
+}
+
+function displayPollOptions(poll) {
+    pollOptions.innerHTML = '';
+    
+    poll.options.forEach((option, index) => {
+        const button = document.createElement('button');
+        button.className = 'button button-secondary';
+        button.textContent = option.text;
+        button.onclick = () => submitVote(index);
+        pollOptions.appendChild(button);
+    });
+}
+
+function displayResults(poll) {
+    results.innerHTML = '';
+    
+    const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
+    
+    poll.options.forEach(option => {
+        const percentage = totalVotes > 0 ? (option.votes / totalVotes * 100).toFixed(1) : 0;
+        
+        const resultBar = document.createElement('div');
+        resultBar.className = 'result-bar';
+        resultBar.innerHTML = `
+            <div class="result-header">
+                <span class="result-text">${option.text}</span>
+                <span class="result-votes">${option.votes} votes (${percentage}%)</span>
+            </div>
+            <div class="result-bar-bg">
+                <div class="result-bar-fill" style="width: ${percentage}%"></div>
+            </div>
+        `;
+        
+        results.appendChild(resultBar);
+    });
+}
+
+// Vote Handling
+function submitVote(optionIndex) {
+    const poll = localPolls.get(peer.id);
+    if (!poll) return;
+    
+    handleVote(optionIndex);
+    
+    // Broadcast vote to all peers
+    for (const conn of connections) {
+        conn.send({
+            type: 'vote',
+            option: optionIndex
+        });
+    }
+}
+
+function handleVote(optionIndex) {
+    const poll = localPolls.get(peer.id);
+    if (!poll || !poll.options[optionIndex]) return;
+    
+    poll.options[optionIndex].votes++;
+    displayResults(poll);
+}
+
+// URL Handling
+function updateShareUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('peer', peer.id);
+    shareUrl.value = url.toString();
+}
+
+function loadPollFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const peerId = urlParams.get('peer');
+    
+    if (peerId && peerId !== peer.id) {
+        connectToPeer(peerId);
+    }
+}
+
+// Event Listeners
+pollForm.addEventListener('submit', e => {
+    e.preventDefault();
+    
+    const question = document.getElementById('question').value;
+    const options = Array.from(document.getElementsByName('option[]'))
+        .map(input => input.value.trim())
+        .filter(value => value);
+    
+    if (question && options.length >= 2) {
+        createPoll(question, options);
+    }
 });
+
+addOptionBtn.addEventListener('click', () => {
+    const container = document.getElementById('options-container');
+    const optionCount = container.children.length;
+    
+    const optionGroup = document.createElement('div');
+    optionGroup.className = 'option-input-group';
+    optionGroup.innerHTML = `
+        <input type="text"
+               name="option[]"
+               class="form-input"
+               placeholder="Option ${optionCount + 1}"
+               required>
+    `;
+    
+    container.appendChild(optionGroup);
+});
+
+copyUrlBtn.addEventListener('click', async () => {
+    try {
+        await navigator.clipboard.writeText(shareUrl.value);
+        copyUrlBtn.textContent = 'Copied!';
+        setTimeout(() => {
+            copyUrlBtn.textContent = 'Copy Link';
+        }, 2000);
+    } catch (err) {
+        console.error('Failed to copy URL:', err);
+    }
+});
+
+// Initialize
+initializePeer();

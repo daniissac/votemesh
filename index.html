@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="VoteMesh - A decentralized peer-to-peer polling application">
     <title>VoteMesh - P2P Polling</title>
     <link rel="icon" type="image/svg+xml" href="votemesh-icon.svg">
     <link rel="stylesheet" href="styles.css">
@@ -36,18 +37,33 @@
                     <label for="question" class="form-label">Question</label>
                     <input type="text" 
                            id="question" 
+                           name="question"
                            class="form-input"
                            placeholder="What's your question?"
+                           minlength="3"
+                           maxlength="200"
                            required>
                 </div>
                 
                 <div id="options-container" class="space-y-2">
                     <label class="form-label">Options</label>
                     <div class="option-input-group">
-                        <input type="text" class="form-input" placeholder="Option 1" required>
+                        <input type="text" 
+                               name="option[]"
+                               class="form-input" 
+                               placeholder="Option 1"
+                               minlength="1"
+                               maxlength="100"
+                               required>
                     </div>
                     <div class="option-input-group">
-                        <input type="text" class="form-input" placeholder="Option 2" required>
+                        <input type="text" 
+                               name="option[]"
+                               class="form-input" 
+                               placeholder="Option 2"
+                               minlength="1"
+                               maxlength="100"
+                               required>
                     </div>
                 </div>
 
@@ -78,10 +94,14 @@
             <div class="share-group">
                 <input type="text" 
                        id="share-url" 
+                       name="share-url"
                        class="form-input share-input"
-                       readonly>
+                       readonly
+                       aria-label="Share URL">
                 <button id="copy-url-btn"
-                        class="button button-blue">
+                        type="button"
+                        class="button button-blue"
+                        aria-label="Copy share URL">
                     Copy Link
                 </button>
             </div>

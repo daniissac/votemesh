@@ -1,15 +1,30 @@
-/* Base styles */
+/* Reset and Base Styles */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
 body {
     background-color: #f3f4f6;
     min-height: 100vh;
     margin: 0;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    line-height: 1.5;
+    color: #1f2937;
 }
 
+/* Layout */
 .container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 2rem 1rem;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+    line-height: 1.2;
+    margin: 0;
 }
 
 /* Header */
@@ -22,12 +37,11 @@ body {
     font-size: 2.25rem;
     font-weight: bold;
     color: #059669;
-    margin: 0 0 0.5rem 0;
+    margin-bottom: 0.5rem;
 }
 
 .header p {
     color: #4b5563;
-    margin: 0;
 }
 
 /* Network Status */
@@ -48,7 +62,7 @@ body {
 .network-info h3 {
     font-size: 1.125rem;
     font-weight: 600;
-    margin: 0 0 0.5rem 0;
+    margin-bottom: 0.5rem;
 }
 
 .network-info p {
@@ -73,7 +87,7 @@ body {
     background-color: #dc2626;  /* red for error */
 }
 
-/* Card styles */
+/* Card Component */
 .card {
     background: white;
     border-radius: 0.5rem;
@@ -85,16 +99,16 @@ body {
 .card h2 {
     font-size: 1.25rem;
     font-weight: 600;
-    margin: 0 0 1rem 0;
+    margin-bottom: 1rem;
 }
 
 .card h3 {
     font-size: 1.125rem;
     font-weight: 600;
-    margin: 0 0 0.5rem 0;
+    margin-bottom: 0.75rem;
 }
 
-/* Form styles */
+/* Form Elements */
 .form-group {
     margin-bottom: 1rem;
 }
@@ -109,12 +123,14 @@ body {
 
 .form-input {
     width: 100%;
-    padding: 0.5rem;
+    padding: 0.625rem;
     border: 1px solid #d1d5db;
     border-radius: 0.375rem;
-    margin-top: 0.25rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    box-sizing: border-box;
+    background-color: white;
+    color: #1f2937;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
 .form-input:focus {
@@ -123,7 +139,11 @@ body {
     box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
 }
 
-/* Button styles */
+.form-input::placeholder {
+    color: #9ca3af;
+}
+
+/* Button Styles */
 .button-group {
     display: flex;
     gap: 0.5rem;
@@ -133,13 +153,20 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.5rem 1rem;
+    padding: 0.625rem 1rem;
     border-radius: 0.375rem;
     font-size: 0.875rem;
     font-weight: 500;
+    line-height: 1.25rem;
     cursor: pointer;
     border: 1px solid transparent;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease-in-out;
+    white-space: nowrap;
+}
+
+.button:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
 }
 
 .button-secondary {
@@ -148,31 +175,30 @@ body {
     border-color: #d1d5db;
 }
 
-.button-secondary:hover {
+.button-secondary:hover:not(:disabled) {
     background-color: #f9fafb;
+    border-color: #9ca3af;
 }
 
 .button-primary {
     color: white;
     background-color: #059669;
-    border-color: transparent;
 }
 
-.button-primary:hover {
+.button-primary:hover:not(:disabled) {
     background-color: #047857;
 }
 
 .button-blue {
     color: white;
     background-color: #2563eb;
-    border-color: transparent;
 }
 
-.button-blue:hover {
+.button-blue:hover:not(:disabled) {
     background-color: #1d4ed8;
 }
 
-/* Poll display */
+/* Poll Display */
 #poll-options {
     margin-bottom: 2rem;
 }
@@ -189,6 +215,7 @@ body {
 .result-header {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 0.25rem;
 }
 
@@ -211,7 +238,7 @@ body {
     transition: width 0.3s ease;
 }
 
-/* Share section */
+/* Share Section */
 .share-group {
     display: flex;
     gap: 0.5rem;
@@ -221,7 +248,7 @@ body {
     flex: 1;
 }
 
-/* Utility classes */
+/* Utility Classes */
 .hidden {
     display: none !important;
 }
@@ -232,4 +259,19 @@ body {
 
 .space-y-4 > * + * {
     margin-top: 1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+    .container {
+        padding: 1rem;
+    }
+
+    .button-group {
+        flex-direction: column;
+    }
+
+    .share-group {
+        flex-direction: column;
+    }
 }
