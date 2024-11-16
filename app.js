@@ -299,8 +299,8 @@ class VoteMesh {
     }
 
     showPoll(poll) {
-        document.getElementById('create-section').classList.add('hidden');
-        document.getElementById('vote-section').classList.remove('hidden');
+        document.getElementById('creator-section').classList.add('hidden');
+        document.getElementById('voter-section').classList.remove('hidden');
         this.updatePollDisplay(poll);
     }
 }
