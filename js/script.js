@@ -38,11 +38,38 @@ export async function initializeVoteMesh() {
 
 async function handleUrlHash() {
     const pollId = window.location.hash.substring(1);
-    if (pollId) {
-        const poll = await discovery.findPoll(pollId);
-        if (poll) {
-            pollManager.displayPoll(poll);
+    if (!pollId) return;
+
+    // First try to get the poll from local storage
+    let poll = pollManager.getPoll(pollId);
+    
+    if (!poll) {
+        // If not found locally, try to find it in the DHT
+        try {
+            poll = await discovery.findPoll(pollId);
+            if (poll) {
+                pollManager.handlePollMessage(poll);
+                poll = pollManager.getPoll(pollId); // Get the poll from manager after handling
+            }
+        } catch (error) {
+            console.warn('Failed to find poll:', error);
         }
+    }
+
+    if (poll) {
+        uiManager.displayPoll(poll);
+    } else {
+        console.warn('Poll not found:', pollId);
+        // Optional: Show a user-friendly message that the poll wasn't found
+        document.getElementById('voter-section').innerHTML = `
+            <div class="p-4 text-center">
+                <h2 class="text-xl font-semibold mb-2">Poll Not Found</h2>
+                <p class="text-gray-600">The poll you're looking for doesn't exist or hasn't been synchronized yet.</p>
+                <p class="text-gray-600">Please try again in a few moments.</p>
+            </div>
+        `;
+        document.getElementById('voter-section').classList.remove('hidden');
+        document.getElementById('creator-section').classList.add('hidden');
     }
 }
 
