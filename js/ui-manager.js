@@ -1,7 +1,16 @@
 export class UIManager {
     constructor(pollManager) {
         this.pollManager = pollManager;
+        this.currentPollId = null;
+        this.refreshInterval = null;
         this.setupEventListeners();
+        
+        // Register for vote updates
+        this.pollManager.registerVoteUpdateCallback((poll) => {
+            if (poll.id === this.currentPollId) {
+                this.updateResults(poll);
+            }
+        });
     }
 
     setupEventListeners() {
@@ -13,6 +22,7 @@ export class UIManager {
     }
 
     displayPoll(poll) {
+        this.currentPollId = poll.id;
         document.getElementById('creator-section').classList.add('hidden');
         document.getElementById('voter-section').classList.remove('hidden');
         
@@ -30,6 +40,9 @@ export class UIManager {
         });
 
         this.updateResults(poll);
+        
+        // Start auto-refresh
+        this.startAutoRefresh();
     }
 
     handleVote(pollId, option) {
@@ -80,5 +93,26 @@ export class UIManager {
     updateNetworkStatus(peerCount, status) {
         document.getElementById('peer-count').textContent = `Connected Peers: ${peerCount}`;
         document.getElementById('dht-status').textContent = `DHT Status: ${status}`;
+    }
+
+    startAutoRefresh() {
+        // Clear any existing refresh interval
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+        }
+        
+        // Set up new refresh interval (every 5 seconds)
+        this.refreshInterval = setInterval(() => {
+            if (this.currentPollId) {
+                this.pollManager.refreshPoll(this.currentPollId);
+            }
+        }, 5000);
+    }
+
+    stopAutoRefresh() {
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+            this.refreshInterval = null;
+        }
     }
 }

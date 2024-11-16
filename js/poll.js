@@ -5,9 +5,17 @@ export class PollManager {
         this.discovery = discovery;
         this.polls = new Map();
         this.activeVoters = new Set();
+        this.voteUpdateCallbacks = new Set();
         
         // Setup poll sync interval
         setInterval(() => this.syncPolls(), 30000);
+
+        // Set up vote update listener
+        this.discovery.on('peerMessage', (peerId, message) => {
+            if (message.type === 'vote' && message.pollId) {
+                this.handleVoteUpdate(message.pollId);
+            }
+        });
     }
 
     createPoll(question, options) {
@@ -99,5 +107,34 @@ export class PollManager {
 
     getAllPolls() {
         return Array.from(this.polls.values());
+    }
+
+    registerVoteUpdateCallback(callback) {
+        this.voteUpdateCallbacks.add(callback);
+    }
+
+    unregisterVoteUpdateCallback(callback) {
+        this.voteUpdateCallbacks.delete(callback);
+    }
+
+    handleVoteUpdate(pollId) {
+        const poll = this.polls.get(pollId);
+        if (poll) {
+            // Notify all registered callbacks
+            this.voteUpdateCallbacks.forEach(callback => callback(poll));
+        }
+    }
+
+    async refreshPoll(pollId) {
+        try {
+            // Try to get updated poll data from the network
+            const updatedPoll = await this.discovery.findPoll(pollId);
+            if (updatedPoll) {
+                this.polls.set(pollId, updatedPoll);
+                this.handleVoteUpdate(pollId);
+            }
+        } catch (error) {
+            console.error('Error refreshing poll:', error);
+        }
     }
 }
