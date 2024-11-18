@@ -18,40 +18,17 @@
 <body>
     <div class="container">
         <!-- Header -->
-        <div class="header">
+        <header>
             <div class="logo">
                 <svg class="mesh-icon" viewBox="0 0 24 24" width="48" height="48">
                     <path fill="currentColor" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
                 </svg>
-                <h1>VoteMesh</h1>
             </div>
-            <p>Decentralized P2P Polling</p>
-        </div>
-
-        <!-- Network Status -->
-        <div id="network-status" class="network-status">
-            <div class="network-header">
-                <div class="network-info">
-                    <h3><i data-feather="activity"></i> Network Status</h3>
-                    <p><i data-feather="users"></i> <span id="peer-count">Connected Peers: 0</span></p>
-                    <p><i data-feather="hash"></i> <span id="peer-id">Your ID: Connecting...</span></p>
-                </div>
-                <div id="connection-indicator" class="connection-indicator">
-                    <i data-feather="wifi"></i>
-                </div>
+            <div id="network-status" class="hidden">
+                <span class="status-indicator"></span>
+                <span class="status-text">Connection Issue</span>
             </div>
-        </div>
-
-        <!-- Templates Section -->
-        <div id="templates-section" class="card">
-            <h2><i data-feather="layout"></i> Poll Templates</h2>
-            <div class="templates-list" id="templates-list">
-                <!-- Templates will be populated here -->
-            </div>
-            <button id="create-template-btn" class="button">
-                <i data-feather="plus-circle"></i> Create New Template
-            </button>
-        </div>
+        </header>
 
         <!-- Poll Creation -->
         <div id="creator-section" class="card">

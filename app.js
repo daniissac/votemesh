@@ -10,6 +10,7 @@ let peer = null;
 let connections = new Set();
 let localPolls = new Map();
 let activePollId = null; // Track the active poll ID
+let selectedOption = null; // Track selected option
 
 // DOM Elements
 const sections = {
@@ -34,65 +35,58 @@ const elements = {
     }
 };
 
+// Network Status Management
+function updateNetworkStatus(isConnected) {
+    const networkStatus = elements.networkStatus;
+    if (!networkStatus) return;
+
+    if (!isConnected) {
+        networkStatus.classList.remove('hidden');
+        networkStatus.querySelector('.status-indicator')?.classList.remove('connected');
+        networkStatus.querySelector('.status-text').textContent = 'Connection Issue';
+    } else {
+        networkStatus.classList.add('hidden');
+    }
+}
+
 // Initialize P2P Connection
 function initializePeer() {
-    const peerConfig = {
-        debug: 2,
-        config: {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' },
-                { urls: 'stun:stun3.l.google.com:19302' },
-                { urls: 'stun:stun4.l.google.com:19302' }
-            ]
-        },
-        // Increase reconnect attempts
-        retries: 5
-    };
-
     try {
-        peer = new Peer(peerConfig);
-        
-        peer.on('open', id => {
-            console.log('Connected with ID:', id);
-            elements.networkStatus.peerId.textContent = `Your ID: ${id}`;
-            elements.networkStatus.indicator.classList.add('connected');
-            elements.networkStatus.indicator.classList.remove('error');
-            loadPollFromUrl();
+        peer = new Peer(generatePeerId(), {
+            debug: 2,
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' },
+                    { urls: 'stun:stun4.l.google.com:19302' }
+                ]
+            }
         });
 
-        peer.on('connection', handleIncomingConnection);
-        
+        peer.on('open', id => {
+            console.log('Connected with ID:', id);
+            updateNetworkStatus(true);
+        });
+
         peer.on('error', error => {
             console.error('Peer connection error:', error);
-            elements.networkStatus.indicator.classList.remove('connected');
-            elements.networkStatus.indicator.classList.add('error');
-            
-            // Attempt to reconnect after a delay
-            setTimeout(() => {
-                if (!peer.disconnected) return;
-                console.log('Attempting to reconnect...');
-                peer.reconnect();
-            }, 5000);
+            updateNetworkStatus(false);
+            handlePeerError(error);
         });
 
         peer.on('disconnected', () => {
-            console.log('Disconnected from server. Attempting to reconnect...');
-            elements.networkStatus.indicator.classList.remove('connected');
-            elements.networkStatus.peerId.textContent = 'Reconnecting...';
-            
-            // Attempt to reconnect
-            setTimeout(() => {
-                if (!peer.destroyed) {
-                    peer.reconnect();
-                }
-            }, 5000);
+            console.log('Disconnected from server');
+            updateNetworkStatus(false);
+            reconnectPeer();
         });
+
+        peer.on('connection', handlePeerConnection);
+
     } catch (error) {
         console.error('Failed to initialize peer:', error);
-        elements.networkStatus.indicator.classList.add('error');
-        elements.networkStatus.peerId.textContent = 'Connection failed';
+        updateNetworkStatus(false);
     }
 }
 
@@ -264,7 +258,7 @@ function displayPollOptions(poll) {
             const button = document.createElement('button');
             button.className = 'button secondary full-width';
             button.innerHTML = `<i data-feather="circle"></i> ${option}`;
-            button.onclick = () => submitVote(index);
+            button.onclick = () => selectOption(index, button);
             
             optionDiv.appendChild(button);
             elements.pollOptions.appendChild(optionDiv);
@@ -274,8 +268,36 @@ function displayPollOptions(poll) {
         if (window.feather) {
             feather.replace();
         }
+
+        // Enable/disable submit button based on selection
+        updateSubmitButton();
     } catch (error) {
         console.error('Error displaying poll options:', error);
+    }
+}
+
+function selectOption(index, button) {
+    // Remove selected class from all buttons
+    const buttons = elements.pollOptions.querySelectorAll('.button');
+    buttons.forEach(btn => btn.classList.remove('selected'));
+    
+    // Add selected class to clicked button
+    button.classList.add('selected');
+    
+    // Update selected option
+    selectedOption = index;
+    
+    // Enable/disable submit button
+    updateSubmitButton();
+}
+
+function updateSubmitButton() {
+    if (!elements.submitVoteBtn) return;
+    
+    if (selectedOption !== null) {
+        elements.submitVoteBtn.removeAttribute('disabled');
+    } else {
+        elements.submitVoteBtn.setAttribute('disabled', 'disabled');
     }
 }
 
@@ -314,36 +336,60 @@ function displayResults(poll) {
 
 // Vote Handling
 function submitVote(optionIndex) {
-    const poll = localPolls.get(activePollId);
-    if (!poll) {
-        console.error('No active poll found'); // Debug log
+    if (!activePollId || !localPolls.has(activePollId)) {
+        console.error('No active poll found');
         return;
     }
-    
-    handleVote(optionIndex);
-    
-    // Broadcast vote to all peers
-    for (const conn of connections) {
-        conn.send({
-            type: 'vote',
-            option: optionIndex
-        });
-    }
-}
 
-function handleVote(optionIndex) {
     const poll = localPolls.get(activePollId);
-    if (!poll || !poll.options[optionIndex]) {
-        console.error('Invalid poll or option index:', { activePollId, optionIndex, poll }); // Debug log
+    
+    // Check if user has already voted
+    const existingVotes = poll.votes[peer.id] || [];
+    if (existingVotes.length > 0) {
+        console.log('User has already voted');
         return;
     }
-    
+
+    // Record the vote
     if (!poll.votes[peer.id]) {
         poll.votes[peer.id] = [];
     }
-    
     poll.votes[peer.id].push(optionIndex);
+
+    // Update local storage
+    localPolls.set(activePollId, poll);
+    storageManager.savePoll(poll);
+
+    // Broadcast vote to peers
+    broadcastToOtherPeers(null, {
+        type: 'vote',
+        pollId: activePollId,
+        option: optionIndex,
+        voterId: peer.id
+    });
+
+    // Update display
     displayResults(poll);
+    
+    // Track analytics
+    analyticsManager.trackVote(poll.id, optionIndex);
+    
+    // Disable voting options after vote is submitted
+    disableVoting();
+}
+
+function disableVoting() {
+    // Disable all option buttons
+    const buttons = elements.pollOptions.querySelectorAll('.button');
+    buttons.forEach(button => {
+        button.setAttribute('disabled', 'disabled');
+        button.classList.add('voted');
+    });
+    
+    // Disable submit button
+    if (elements.submitVoteBtn) {
+        elements.submitVoteBtn.setAttribute('disabled', 'disabled');
+    }
 }
 
 // URL Handling
@@ -375,43 +421,54 @@ function loadPollFromUrl() {
     }
 }
 
-// Template Integration
-function initializeTemplates() {
-    const templatesList = document.getElementById('templates-list');
-    const createTemplateBtn = document.getElementById('create-template-btn');
-    
-    createTemplateBtn.addEventListener('click', () => {
-        // Show template creation modal
-        showTemplateModal();
-    });
-    
-    // Load and display templates
-    refreshTemplatesList();
-}
+// Event Listener Setup
+function setupEventListeners() {
+    if (!elements.createPollForm) return;
 
-async function refreshTemplatesList() {
-    const templatesList = document.getElementById('templates-list');
-    const templates = await templatesManager.getAllTemplates();
+    elements.createPollForm.addEventListener('submit', handlePollCreation);
+    elements.addOptionBtn?.addEventListener('click', addOptionInput);
     
-    templatesList.innerHTML = templates.map(template => `
-        <div class="template-card" data-template-id="${template.id}">
-            <h3>${template.name}</h3>
-            <p>${template.question}</p>
-        </div>
-    `).join('');
-    
-    // Add click handlers
-    templatesList.querySelectorAll('.template-card').forEach(card => {
-        card.addEventListener('click', () => useTemplate(card.dataset.templateId));
+    // Remove option buttons
+    document.addEventListener('click', event => {
+        if (event.target.closest('.remove-option')) {
+            const optionInput = event.target.closest('.option-input');
+            if (optionInput && document.querySelectorAll('.option-input').length > 2) {
+                optionInput.remove();
+            }
+        }
     });
-}
 
-async function useTemplate(templateId) {
-    const poll = await templatesManager.createPollFromTemplate(templateId);
-    if (poll) {
-        document.getElementById('question').value = poll.question;
-        updatePollOptions(poll.options);
-    }
+    // Submit vote button
+    elements.submitVoteBtn?.addEventListener('click', () => {
+        if (selectedOption !== null) {
+            submitVote(selectedOption);
+            selectedOption = null;
+        }
+    });
+
+    // Export results
+    elements.exportBtn?.addEventListener('click', async () => {
+        const poll = localPolls.get(activePollId);
+        if (!poll) return;
+        
+        const results = {
+            question: poll.question,
+            options: poll.options,
+            votes: poll.votes,
+            created: poll.created,
+            id: poll.id
+        };
+        
+        downloadJson(results, `poll-results-${poll.id}.json`);
+    });
+
+    // Export analytics
+    elements.exportAnalyticsBtn?.addEventListener('click', async () => {
+        const analytics = await analyticsManager.exportAnalytics(activePollId);
+        if (!analytics) return;
+        
+        downloadJson(analytics, `poll-analytics-${activePollId}.json`);
+    });
 }
 
 // Initialize the application
@@ -427,10 +484,6 @@ async function initializeApp() {
         initializePeer();
         console.log('Peer initialized');
         
-        // Initialize templates
-        await initializeTemplates();
-        console.log('Templates initialized');
-        
         // Setup event listeners
         setupEventListeners();
         console.log('Event listeners set up');
@@ -441,175 +494,6 @@ async function initializeApp() {
         // Show error to user
         elements.networkStatus.peerId.textContent = 'Failed to initialize application';
         elements.networkStatus.indicator.classList.add('error');
-    }
-}
-
-// Event Listener Setup
-function setupEventListeners() {
-    if (!peer) {
-        console.error('Peer not initialized');
-        return;
-    }
-
-    // Network status updates
-    peer.on('connection', () => {
-        elements.networkStatus.indicator.classList.add('connected');
-    });
-
-    peer.on('disconnected', () => {
-        elements.networkStatus.indicator.classList.remove('connected');
-    });
-
-    // Template management
-    const templatesList = document.getElementById('templates-list');
-    const createTemplateBtn = document.getElementById('create-template-btn');
-    
-    if (createTemplateBtn) {
-        createTemplateBtn.addEventListener('click', () => {
-            showTemplateModal();
-        });
-    }
-
-    if (templatesList) {
-        templatesList.addEventListener('click', (e) => {
-            const templateCard = e.target.closest('.template-card');
-            if (templateCard) {
-                useTemplate(templateCard.dataset.templateId);
-            }
-        });
-    }
-
-    // Poll form submission
-    elements.pollForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const question = document.getElementById('question').value;
-        const options = Array.from(document.getElementsByName('option[]'))
-            .map(input => input.value.trim())
-            .filter(value => value);
-        
-        if (question && options.length >= 2) {
-            await createPoll(question, options);
-        }
-    });
-
-    // Add option button
-    elements.addOptionBtn.addEventListener('click', () => {
-        const optionsDiv = document.getElementById('poll-options');
-        const currentOptions = optionsDiv.querySelectorAll('.option-input-group').length;
-        addOption(currentOptions + 1);
-    });
-
-    // Copy URL button
-    elements.copyUrlBtn.addEventListener('click', async () => {
-        try {
-            await navigator.clipboard.writeText(elements.shareUrl.value);
-            elements.copyUrlBtn.textContent = 'Copied!';
-            setTimeout(() => {
-                elements.copyUrlBtn.textContent = 'Copy URL';
-            }, 2000);
-        } catch (err) {
-            console.error('Failed to copy URL:', err);
-        }
-    });
-
-    // Export buttons
-    document.getElementById('export-results-btn')?.addEventListener('click', async () => {
-        if (!activePollId) return;
-        
-        const poll = localPolls.get(activePollId);
-        if (!poll) return;
-        
-        const data = {
-            question: poll.question,
-            options: poll.options,
-            votes: poll.votes,
-            createdAt: poll.createdAt
-        };
-        
-        downloadJson(data, `poll-results-${activePollId}.json`);
-    });
-
-    document.getElementById('export-analytics-btn')?.addEventListener('click', async () => {
-        if (!activePollId) return;
-        
-        const analytics = await analyticsManager.exportAnalytics(activePollId);
-        if (!analytics) return;
-        
-        downloadJson(analytics, `poll-analytics-${activePollId}.json`);
-    });
-}
-
-// Template Modal Functions
-function showTemplateModal() {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <h2><i data-feather="file-plus"></i> Create Template</h2>
-            <form id="template-form">
-                <div class="form-group">
-                    <label for="template-name">Template Name</label>
-                    <input type="text" id="template-name" required>
-                </div>
-                <div class="form-group">
-                    <label for="template-question">Question</label>
-                    <input type="text" id="template-question" required>
-                </div>
-                <div class="form-group">
-                    <label>Options</label>
-                    <div id="template-options">
-                        <input type="text" name="template-option[]" required>
-                        <input type="text" name="template-option[]" required>
-                    </div>
-                    <button type="button" id="add-template-option">Add Option</button>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="button secondary" onclick="closeTemplateModal()">Cancel</button>
-                    <button type="submit" class="button primary">Save Template</button>
-                </div>
-            </form>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
-    feather.replace();
-
-    // Add event listeners
-    const form = modal.querySelector('#template-form');
-    const addOptionBtn = modal.querySelector('#add-template-option');
-
-    addOptionBtn.addEventListener('click', () => {
-        const optionsContainer = modal.querySelector('#template-options');
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.name = 'template-option[]';
-        input.required = true;
-        optionsContainer.appendChild(input);
-    });
-
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const template = {
-            id: Date.now().toString(),
-            name: modal.querySelector('#template-name').value,
-            question: modal.querySelector('#template-question').value,
-            options: Array.from(modal.querySelectorAll('[name="template-option[]"]'))
-                .map(input => input.value.trim())
-                .filter(Boolean)
-        };
-
-        await templatesManager.saveTemplate(template);
-        closeTemplateModal();
-        refreshTemplatesList();
-    });
-}
-
-function closeTemplateModal() {
-    const modal = document.querySelector('.modal');
-    if (modal) {
-        modal.remove();
     }
 }
 
