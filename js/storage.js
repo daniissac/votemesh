@@ -5,48 +5,67 @@ class StorageManager {
         this.dbVersion = 1;
         this.db = null;
         this.ready = false;
+        this.initPromise = null;
     }
 
     // IndexedDB initialization
     async initializeIndexedDB() {
         if (this.ready) return Promise.resolve();
+        if (this.initPromise) return this.initPromise;
 
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(this.dbName, this.dbVersion);
+        this.initPromise = new Promise((resolve, reject) => {
+            try {
+                const request = indexedDB.open(this.dbName, this.dbVersion);
 
-            request.onerror = () => {
-                console.error('Failed to open database:', request.error);
-                reject(request.error);
-            };
+                request.onerror = () => {
+                    console.error('Failed to open database:', request.error);
+                    this.ready = false;
+                    reject(request.error);
+                };
 
-            request.onsuccess = () => {
-                this.db = request.result;
-                this.ready = true;
-                console.log('Database initialized successfully');
-                resolve();
-            };
+                request.onsuccess = () => {
+                    this.db = request.result;
+                    this.ready = true;
+                    console.log('Database initialized successfully');
+                    resolve();
+                };
 
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
-                
-                // Polls store
-                if (!db.objectStoreNames.contains('polls')) {
-                    const pollStore = db.createObjectStore('polls', { keyPath: 'id' });
-                    pollStore.createIndex('createdAt', 'createdAt', { unique: false });
-                }
+                request.onupgradeneeded = (event) => {
+                    console.log('Upgrading database...');
+                    const db = event.target.result;
+                    
+                    // Polls store
+                    if (!db.objectStoreNames.contains('polls')) {
+                        const pollStore = db.createObjectStore('polls', { keyPath: 'id' });
+                        pollStore.createIndex('createdAt', 'createdAt', { unique: false });
+                    }
 
-                // Templates store
-                if (!db.objectStoreNames.contains('templates')) {
-                    db.createObjectStore('templates', { keyPath: 'id' });
-                }
+                    // Templates store
+                    if (!db.objectStoreNames.contains('templates')) {
+                        db.createObjectStore('templates', { keyPath: 'id' });
+                    }
 
-                // Analytics store
-                if (!db.objectStoreNames.contains('analytics')) {
-                    const analyticsStore = db.createObjectStore('analytics', { keyPath: 'pollId' });
-                    analyticsStore.createIndex('timestamp', 'timestamp', { unique: false });
-                }
-            };
+                    // Analytics store
+                    if (!db.objectStoreNames.contains('analytics')) {
+                        const analyticsStore = db.createObjectStore('analytics', { keyPath: 'pollId' });
+                        analyticsStore.createIndex('timestamp', 'timestamp', { unique: false });
+                    }
+                };
+            } catch (error) {
+                console.error('Error initializing database:', error);
+                this.ready = false;
+                reject(error);
+            }
         });
+
+        return this.initPromise;
+    }
+
+    // Check if database is ready
+    async ensureReady() {
+        if (!this.ready) {
+            await this.initializeIndexedDB();
+        }
     }
 
     // LocalStorage Methods
@@ -95,26 +114,52 @@ class StorageManager {
         return this.getFromStore('analytics', pollId);
     }
 
-    // Generic IndexedDB operations
+    // Generic IndexedDB operations with ready check
     async saveToStore(storeName, data) {
+        await this.ensureReady();
         return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction(storeName, 'readwrite');
-            const store = transaction.objectStore(storeName);
-            const request = store.put(data);
+            try {
+                const transaction = this.db.transaction(storeName, 'readwrite');
+                const store = transaction.objectStore(storeName);
+                const request = store.put(data);
 
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            } catch (error) {
+                reject(error);
+            }
         });
     }
 
     async getFromStore(storeName, key) {
+        await this.ensureReady();
         return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction(storeName, 'readonly');
-            const store = transaction.objectStore(storeName);
-            const request = store.get(key);
+            try {
+                const transaction = this.db.transaction(storeName, 'readonly');
+                const store = transaction.objectStore(storeName);
+                const request = store.get(key);
 
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
+    async getAllFromStore(storeName) {
+        await this.ensureReady();
+        return new Promise((resolve, reject) => {
+            try {
+                const transaction = this.db.transaction(storeName, 'readonly');
+                const store = transaction.objectStore(storeName);
+                const request = store.getAll();
+
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            } catch (error) {
+                reject(error);
+            }
         });
     }
 
@@ -149,17 +194,6 @@ class StorageManager {
     }
 
     // Helper methods
-    async getAllFromStore(storeName) {
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction(storeName, 'readonly');
-            const store = transaction.objectStore(storeName);
-            const request = store.getAll();
-
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-    }
-
     async importToStore(storeName, items) {
         const transaction = this.db.transaction(storeName, 'readwrite');
         const store = transaction.objectStore(storeName);

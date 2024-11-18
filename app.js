@@ -3,7 +3,6 @@ let storageReady = false;
 document.addEventListener('DOMContentLoaded', async () => {
     await storageManager.initializeIndexedDB();
     storageReady = true;
-    initializeApp();
 });
 
 // P2P Connection Management
@@ -34,21 +33,64 @@ const copyUrlBtn = document.getElementById('copy-url-btn');
 
 // Initialize P2P Connection
 function initializePeer() {
-    peer = new Peer();
-    
-    peer.on('open', id => {
-        networkStatus.peerId.textContent = `Your ID: ${id}`;
-        networkStatus.indicator.classList.add('connected');
-        loadPollFromUrl();
-    });
+    const peerConfig = {
+        debug: 2,
+        config: {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' }
+            ]
+        },
+        // Increase reconnect attempts
+        retries: 5
+    };
 
-    peer.on('connection', handleIncomingConnection);
-    
-    peer.on('error', error => {
-        console.error('Peer connection error:', error);
-        networkStatus.indicator.classList.remove('connected');
+    try {
+        peer = new Peer(peerConfig);
+        
+        peer.on('open', id => {
+            console.log('Connected with ID:', id);
+            networkStatus.peerId.textContent = `Your ID: ${id}`;
+            networkStatus.indicator.classList.add('connected');
+            networkStatus.indicator.classList.remove('error');
+            loadPollFromUrl();
+        });
+
+        peer.on('connection', handleIncomingConnection);
+        
+        peer.on('error', error => {
+            console.error('Peer connection error:', error);
+            networkStatus.indicator.classList.remove('connected');
+            networkStatus.indicator.classList.add('error');
+            
+            // Attempt to reconnect after a delay
+            setTimeout(() => {
+                if (!peer.disconnected) return;
+                console.log('Attempting to reconnect...');
+                peer.reconnect();
+            }, 5000);
+        });
+
+        peer.on('disconnected', () => {
+            console.log('Disconnected from server. Attempting to reconnect...');
+            networkStatus.indicator.classList.remove('connected');
+            networkStatus.peerId.textContent = 'Reconnecting...';
+            
+            // Attempt to reconnect
+            setTimeout(() => {
+                if (!peer.destroyed) {
+                    peer.reconnect();
+                }
+            }, 5000);
+        });
+    } catch (error) {
+        console.error('Failed to initialize peer:', error);
         networkStatus.indicator.classList.add('error');
-    });
+        networkStatus.peerId.textContent = 'Connection failed';
+    }
 }
 
 // Connection Handling
@@ -303,98 +345,43 @@ async function useTemplate(templateId) {
     }
 }
 
-// Event Listeners
-pollForm.addEventListener('submit', e => {
-    e.preventDefault();
-    
-    const question = document.getElementById('question').value;
-    const options = Array.from(document.getElementsByName('option[]'))
-        .map(input => input.value.trim())
-        .filter(value => value);
-    
-    if (question && options.length >= 2) {
-        createPoll(question, options);
-    }
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-    // Add two default options
-    for (let i = 1; i <= 2; i++) {
-        addOption(i);
-    }
-});
-
-function addOption(number) {
-    const optionsDiv = document.getElementById('poll-options');
-    const optionGroup = document.createElement('div');
-    optionGroup.className = 'option-input-group';
-    optionGroup.innerHTML = `
-        <input type="text"
-               name="option[]"
-               class="form-input"
-               placeholder="Option ${number}"
-               required>
-    `;
-    optionsDiv.appendChild(optionGroup);
-}
-
-addOptionBtn.addEventListener('click', () => {
-    const optionsDiv = document.getElementById('poll-options');
-    const currentOptions = optionsDiv.querySelectorAll('.option-input-group').length;
-    addOption(currentOptions + 1);
-});
-
-copyUrlBtn.addEventListener('click', async () => {
+// Initialize the application
+async function initializeApp() {
     try {
-        await navigator.clipboard.writeText(shareUrl.value);
-        copyUrlBtn.textContent = 'Copied!';
-        setTimeout(() => {
-            copyUrlBtn.textContent = 'Copy Link';
-        }, 2000);
-    } catch (err) {
-        console.error('Failed to copy URL:', err);
+        console.log('Initializing application...');
+        
+        // First, initialize the database
+        await storageManager.initializeIndexedDB();
+        console.log('Database initialized');
+        
+        // Initialize peer connection
+        initializePeer();
+        console.log('Peer initialized');
+        
+        // Initialize templates
+        await initializeTemplates();
+        console.log('Templates initialized');
+        
+        // Setup event listeners
+        setupEventListeners();
+        console.log('Event listeners set up');
+        
+        console.log('Application initialized successfully');
+    } catch (error) {
+        console.error('Failed to initialize application:', error);
+        // Show error to user
+        networkStatus.peerId.textContent = 'Failed to initialize application';
+        networkStatus.indicator.classList.add('error');
     }
-});
-
-document.getElementById('export-results-btn').addEventListener('click', async () => {
-    if (!activePollId) return;
-    
-    const poll = localPolls.get(activePollId);
-    if (!poll) return;
-    
-    const data = {
-        question: poll.question,
-        options: poll.options,
-        votes: poll.votes,
-        createdAt: poll.createdAt
-    };
-    
-    downloadJson(data, `poll-results-${activePollId}.json`);
-});
-
-document.getElementById('export-analytics-btn').addEventListener('click', async () => {
-    if (!activePollId) return;
-    
-    const analytics = await analyticsManager.exportAnalytics(activePollId);
-    if (!analytics) return;
-    
-    downloadJson(analytics, `poll-analytics-${activePollId}.json`);
-});
-
-function downloadJson(data, filename) {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 }
 
 // Event Listener Setup
 function setupEventListeners() {
+    if (!peer) {
+        console.error('Peer not initialized');
+        return;
+    }
+
     // Network status updates
     peer.on('connection', () => {
         networkStatus.indicator.classList.add('connected');
@@ -422,6 +409,66 @@ function setupEventListeners() {
             }
         });
     }
+
+    // Poll form submission
+    pollForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const question = document.getElementById('question').value;
+        const options = Array.from(document.getElementsByName('option[]'))
+            .map(input => input.value.trim())
+            .filter(value => value);
+        
+        if (question && options.length >= 2) {
+            await createPoll(question, options);
+        }
+    });
+
+    // Add option button
+    addOptionBtn.addEventListener('click', () => {
+        const optionsDiv = document.getElementById('poll-options');
+        const currentOptions = optionsDiv.querySelectorAll('.option-input-group').length;
+        addOption(currentOptions + 1);
+    });
+
+    // Copy URL button
+    copyUrlBtn.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(shareUrl.value);
+            copyUrlBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copyUrlBtn.textContent = 'Copy URL';
+            }, 2000);
+        } catch (err) {
+            console.error('Failed to copy URL:', err);
+        }
+    });
+
+    // Export buttons
+    document.getElementById('export-results-btn')?.addEventListener('click', async () => {
+        if (!activePollId) return;
+        
+        const poll = localPolls.get(activePollId);
+        if (!poll) return;
+        
+        const data = {
+            question: poll.question,
+            options: poll.options,
+            votes: poll.votes,
+            createdAt: poll.createdAt
+        };
+        
+        downloadJson(data, `poll-results-${activePollId}.json`);
+    });
+
+    document.getElementById('export-analytics-btn')?.addEventListener('click', async () => {
+        if (!activePollId) return;
+        
+        const analytics = await analyticsManager.exportAnalytics(activePollId);
+        if (!analytics) return;
+        
+        downloadJson(analytics, `poll-analytics-${activePollId}.json`);
+    });
 }
 
 // Template Modal Functions
@@ -497,15 +544,31 @@ function closeTemplateModal() {
     }
 }
 
-// Initialize templates when app starts
-function initializeApp() {
-    initializePeer();
-    initializeTemplates();
-    setupEventListeners();
-}
-
-// Initialize
-document.addEventListener('DOMContentLoaded', async () => {
-    await storageManager.initializeIndexedDB();
-    initializeApp();
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM Content Loaded');
+    initializeApp().catch(error => {
+        console.error('Failed to initialize application:', error);
+    });
 });
+
+// Add two default options
+document.addEventListener('DOMContentLoaded', () => {
+    for (let i = 1; i <= 2; i++) {
+        addOption(i);
+    }
+});
+
+function addOption(number) {
+    const optionsDiv = document.getElementById('poll-options');
+    const optionGroup = document.createElement('div');
+    optionGroup.className = 'option-input-group';
+    optionGroup.innerHTML = `
+        <input type="text"
+               name="option[]"
+               class="form-input"
+               placeholder="Option ${number}"
+               required>
+    `;
+    optionsDiv.appendChild(optionGroup);
+}
