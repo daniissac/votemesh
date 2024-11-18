@@ -100,9 +100,20 @@
                 </div>
 
                 <button type="submit" class="button primary">
-                    <i data-feather="send"></i> Create Poll
+                    <i data-feather="play"></i> Create Poll
                 </button>
             </form>
+        </div>
+
+        <!-- Share Section -->
+        <div id="share-section" class="card">
+            <h2><i data-feather="share-2"></i> Share Poll</h2>
+            <div class="share-group">
+                <input type="text" id="share-url" class="form-input" readonly>
+                <button id="copy-url-btn" class="button">
+                    <i data-feather="copy"></i> Copy URL
+                </button>
+            </div>
         </div>
 
         <!-- Voter Section -->
@@ -149,17 +160,6 @@
                 </button>
                 <button id="export-analytics-btn" class="button secondary">
                     <i data-feather="download-cloud"></i> Export Analytics
-                </button>
-            </div>
-        </div>
-
-        <!-- Share Section -->
-        <div id="share-section" class="card hidden">
-            <h2><i data-feather="share-2"></i> Share Poll</h2>
-            <div class="share-url-container">
-                <input type="text" id="share-url" readonly class="share-input">
-                <button id="copy-url-btn" class="button">
-                    <i data-feather="copy"></i> Copy URL
                 </button>
             </div>
         </div>

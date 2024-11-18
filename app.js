@@ -292,9 +292,22 @@ function handleVote(optionIndex) {
 
 // URL Handling
 function updateShareUrl() {
-    const url = new URL(window.location.href);
-    url.searchParams.set('peer', peer.id);
-    shareUrl.value = url.toString();
+    const shareUrlInput = document.getElementById('share-url');
+    const shareSection = document.getElementById('share-section');
+    
+    if (!shareUrlInput || !shareSection) {
+        console.error('Share URL elements not found');
+        return;
+    }
+
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('peer', peer.id);
+        shareUrlInput.value = url.toString();
+        shareSection.classList.remove('hidden');
+    } catch (error) {
+        console.error('Failed to update share URL:', error);
+    }
 }
 
 function loadPollFromUrl() {
