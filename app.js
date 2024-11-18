@@ -5,35 +5,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     storageReady = true;
 });
 
-// P2P Connection Management
+// Global Variables
 let peer = null;
 let connections = new Set();
 let localPolls = new Map();
-let activePollId = null; // Track the active poll ID
-let selectedOption = null; // Track selected option
+let activePollId = null;
+let selectedOption = null;
 
 // DOM Elements
-const sections = {
-    creator: document.getElementById('creator-section'),
-    voter: document.getElementById('voter-section'),
-    share: document.getElementById('share-section'),
-    results: document.getElementById('results-section')
-};
-
 const elements = {
-    pollForm: document.getElementById('poll-form'),
-    pollOptions: document.getElementById('poll-vote-options'), 
-    pollOptionsContainer: document.getElementById('poll-options'),
-    addOptionBtn: document.getElementById('add-option-btn'),
+    createPollForm: document.getElementById('create-poll-form'),
+    pollOptions: document.getElementById('poll-options'),
+    addOptionBtn: document.getElementById('add-option'),
+    submitVoteBtn: document.getElementById('submit-vote'),
+    exportBtn: document.getElementById('export-results'),
+    exportAnalyticsBtn: document.getElementById('export-analytics'),
     shareUrl: document.getElementById('share-url'),
-    copyUrlBtn: document.getElementById('copy-url-btn'),
-    submitVoteBtn: document.getElementById('submit-vote-btn'),
-    networkStatus: {
-        peerId: document.getElementById('peer-id'),
-        peerCount: document.getElementById('peer-count'),
-        indicator: document.getElementById('connection-indicator')
+    networkStatus: document.getElementById('network-status'),
+    sections: {
+        creator: document.getElementById('creator-section'),
+        voter: document.getElementById('voter-section')
     }
 };
+
+// Utility Functions
+function generatePeerId() {
+    return 'peer-' + Math.random().toString(36).substr(2, 9);
+}
 
 // Network Status Management
 function updateNetworkStatus(isConnected) {
@@ -42,14 +40,17 @@ function updateNetworkStatus(isConnected) {
 
     if (!isConnected) {
         networkStatus.classList.remove('hidden');
-        networkStatus.querySelector('.status-indicator')?.classList.remove('connected');
-        networkStatus.querySelector('.status-text').textContent = 'Connection Issue';
+        const indicator = networkStatus.querySelector('.status-indicator');
+        const statusText = networkStatus.querySelector('.status-text');
+        
+        if (indicator) indicator.classList.remove('connected');
+        if (statusText) statusText.textContent = 'Connection Issue';
     } else {
         networkStatus.classList.add('hidden');
     }
 }
 
-// Initialize P2P Connection
+// P2P Connection Management
 function initializePeer() {
     try {
         peer = new Peer(generatePeerId(), {
@@ -90,6 +91,21 @@ function initializePeer() {
     }
 }
 
+// Error Handling
+function handlePeerError(error) {
+    console.error('Peer error:', error);
+    updateNetworkStatus(false);
+}
+
+function reconnectPeer() {
+    if (!peer || peer.destroyed) return;
+    
+    console.log('Attempting to reconnect...');
+    setTimeout(() => {
+        peer.reconnect();
+    }, 5000);
+}
+
 // Connection Handling
 function handleIncomingConnection(conn) {
     connections.add(conn);
@@ -124,7 +140,8 @@ function connectToPeer(peerId) {
 }
 
 function updatePeerCount() {
-    elements.networkStatus.peerCount.textContent = `Connected Peers: ${connections.size}`;
+    const peerCount = elements.networkStatus.querySelector('.peer-count');
+    if (peerCount) peerCount.textContent = `Connected Peers: ${connections.size}`;
 }
 
 // Data Handling
@@ -221,9 +238,8 @@ function displayPoll(poll) {
 
     try {
         // Hide creator section and show voter/share sections
-        sections.creator.classList.add('hidden');
-        sections.voter.classList.remove('hidden');
-        sections.share.classList.remove('hidden');
+        elements.sections.creator.classList.add('hidden');
+        elements.sections.voter.classList.remove('hidden');
         
         // Update question
         const questionElement = document.getElementById('poll-question');
@@ -395,10 +411,8 @@ function disableVoting() {
 // URL Handling
 function updateShareUrl() {
     const shareUrlInput = elements.shareUrl;
-    const shareSection = sections.share;
-    
-    if (!shareUrlInput || !shareSection) {
-        console.error('Share URL elements not found');
+    if (!shareUrlInput) {
+        console.error('Share URL input not found');
         return;
     }
 
@@ -406,7 +420,6 @@ function updateShareUrl() {
         const url = new URL(window.location.href);
         url.searchParams.set('peer', peer.id);
         shareUrlInput.value = url.toString();
-        shareSection.classList.remove('hidden');
     } catch (error) {
         console.error('Failed to update share URL:', error);
     }
@@ -476,8 +489,8 @@ async function initializeApp() {
     try {
         console.log('Initializing application...');
         
-        // First, initialize the database
-        await storageManager.initializeIndexedDB();
+        // Initialize database
+        await storageManager.initializeDatabase();
         console.log('Database initialized');
         
         // Initialize peer connection
@@ -491,9 +504,7 @@ async function initializeApp() {
         console.log('Application initialized successfully');
     } catch (error) {
         console.error('Failed to initialize application:', error);
-        // Show error to user
-        elements.networkStatus.peerId.textContent = 'Failed to initialize application';
-        elements.networkStatus.indicator.classList.add('error');
+        updateNetworkStatus(false);
     }
 }
 
@@ -513,7 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function addOption(number) {
-    if (!elements.pollOptionsContainer) {
+    if (!elements.pollOptions) {
         console.error('Poll options container not found');
         return;
     }
@@ -527,5 +538,5 @@ function addOption(number) {
                placeholder="Option ${number}"
                required>
     `;
-    elements.pollOptionsContainer.appendChild(optionGroup);
+    elements.pollOptions.appendChild(optionGroup);
 }
