@@ -551,3 +551,40 @@ body {
 .modal-actions button {
     min-width: 100px;
 }
+
+/* Voting Options */
+.option-group {
+    margin-bottom: 0.75rem;
+}
+
+.option-group .button {
+    width: 100%;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    transition: all 0.2s ease;
+}
+
+.option-group .button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.option-group .button i {
+    color: var(--accent-color);
+}
+
+.option-group .button.selected {
+    background: var(--accent-color);
+    color: white;
+}
+
+.option-group .button.selected i {
+    color: white;
+}
+
+.full-width {
+    width: 100%;
+}

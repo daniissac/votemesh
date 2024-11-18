@@ -21,10 +21,12 @@ const sections = {
 
 const elements = {
     pollForm: document.getElementById('poll-form'),
-    pollOptions: document.getElementById('poll-vote-options'),
+    pollOptions: document.getElementById('poll-vote-options'), 
+    pollOptionsContainer: document.getElementById('poll-options'),
     addOptionBtn: document.getElementById('add-option-btn'),
     shareUrl: document.getElementById('share-url'),
     copyUrlBtn: document.getElementById('copy-url-btn'),
+    submitVoteBtn: document.getElementById('submit-vote-btn'),
     networkStatus: {
         peerId: document.getElementById('peer-id'),
         peerCount: document.getElementById('peer-count'),
@@ -256,12 +258,22 @@ function displayPollOptions(poll) {
         elements.pollOptions.innerHTML = '';
         
         poll.options.forEach((option, index) => {
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'option-group';
+            
             const button = document.createElement('button');
-            button.className = 'button secondary';
-            button.textContent = option;
+            button.className = 'button secondary full-width';
+            button.innerHTML = `<i data-feather="circle"></i> ${option}`;
             button.onclick = () => submitVote(index);
-            elements.pollOptions.appendChild(button);
+            
+            optionDiv.appendChild(button);
+            elements.pollOptions.appendChild(optionDiv);
         });
+        
+        // Re-initialize Feather icons for the new buttons
+        if (window.feather) {
+            feather.replace();
+        }
     } catch (error) {
         console.error('Error displaying poll options:', error);
     }
@@ -617,7 +629,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function addOption(number) {
-    const optionsDiv = document.getElementById('poll-options');
+    if (!elements.pollOptionsContainer) {
+        console.error('Poll options container not found');
+        return;
+    }
+
     const optionGroup = document.createElement('div');
     optionGroup.className = 'option-input-group';
     optionGroup.innerHTML = `
@@ -627,5 +643,5 @@ function addOption(number) {
                placeholder="Option ${number}"
                required>
     `;
-    optionsDiv.appendChild(optionGroup);
+    elements.pollOptionsContainer.appendChild(optionGroup);
 }
