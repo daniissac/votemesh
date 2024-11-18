@@ -383,6 +383,110 @@ function downloadJson(data, filename) {
     URL.revokeObjectURL(url);
 }
 
+// Event Listener Setup
+function setupEventListeners() {
+    // Network status updates
+    peer.on('connection', () => {
+        networkStatus.indicator.classList.add('connected');
+    });
+
+    peer.on('disconnected', () => {
+        networkStatus.indicator.classList.remove('connected');
+    });
+
+    // Template management
+    const templatesList = document.getElementById('templates-list');
+    const createTemplateBtn = document.getElementById('create-template-btn');
+    
+    if (createTemplateBtn) {
+        createTemplateBtn.addEventListener('click', () => {
+            showTemplateModal();
+        });
+    }
+
+    if (templatesList) {
+        templatesList.addEventListener('click', (e) => {
+            const templateCard = e.target.closest('.template-card');
+            if (templateCard) {
+                useTemplate(templateCard.dataset.templateId);
+            }
+        });
+    }
+}
+
+// Template Modal Functions
+function showTemplateModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h2><i data-feather="file-plus"></i> Create Template</h2>
+            <form id="template-form">
+                <div class="form-group">
+                    <label for="template-name">Template Name</label>
+                    <input type="text" id="template-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="template-question">Question</label>
+                    <input type="text" id="template-question" required>
+                </div>
+                <div class="form-group">
+                    <label>Options</label>
+                    <div id="template-options">
+                        <input type="text" name="template-option[]" required>
+                        <input type="text" name="template-option[]" required>
+                    </div>
+                    <button type="button" id="add-template-option">Add Option</button>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="button secondary" onclick="closeTemplateModal()">Cancel</button>
+                    <button type="submit" class="button primary">Save Template</button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    feather.replace();
+
+    // Add event listeners
+    const form = modal.querySelector('#template-form');
+    const addOptionBtn = modal.querySelector('#add-template-option');
+
+    addOptionBtn.addEventListener('click', () => {
+        const optionsContainer = modal.querySelector('#template-options');
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.name = 'template-option[]';
+        input.required = true;
+        optionsContainer.appendChild(input);
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const template = {
+            id: Date.now().toString(),
+            name: modal.querySelector('#template-name').value,
+            question: modal.querySelector('#template-question').value,
+            options: Array.from(modal.querySelectorAll('[name="template-option[]"]'))
+                .map(input => input.value.trim())
+                .filter(Boolean)
+        };
+
+        await templatesManager.saveTemplate(template);
+        closeTemplateModal();
+        refreshTemplatesList();
+    });
+}
+
+function closeTemplateModal() {
+    const modal = document.querySelector('.modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
 // Initialize templates when app starts
 function initializeApp() {
     initializePeer();
@@ -391,4 +495,7 @@ function initializeApp() {
 }
 
 // Initialize
-initializeApp();
+document.addEventListener('DOMContentLoaded', async () => {
+    await storageManager.initializeIndexedDB();
+    initializeApp();
+});

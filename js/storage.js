@@ -3,17 +3,26 @@ class StorageManager {
     constructor() {
         this.dbName = 'votemesh';
         this.dbVersion = 1;
-        this.initializeIndexedDB();
+        this.db = null;
+        this.ready = false;
     }
 
     // IndexedDB initialization
     async initializeIndexedDB() {
+        if (this.ready) return Promise.resolve();
+
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, this.dbVersion);
 
-            request.onerror = () => reject(request.error);
+            request.onerror = () => {
+                console.error('Failed to open database:', request.error);
+                reject(request.error);
+            };
+
             request.onsuccess = () => {
                 this.db = request.result;
+                this.ready = true;
+                console.log('Database initialized successfully');
                 resolve();
             };
 
