@@ -12,24 +12,25 @@ let localPolls = new Map();
 let activePollId = null; // Track the active poll ID
 
 // DOM Elements
-const networkStatus = {
-    peerCount: document.getElementById('peer-count'),
-    peerId: document.getElementById('peer-id'),
-    indicator: document.getElementById('connection-indicator')
-};
-
 const sections = {
     creator: document.getElementById('creator-section'),
     voter: document.getElementById('voter-section'),
-    share: document.getElementById('share-section')
+    share: document.getElementById('share-section'),
+    results: document.getElementById('results-section')
 };
 
-const pollForm = document.getElementById('poll-form');
-const addOptionBtn = document.getElementById('add-option-btn');
-const pollOptions = document.getElementById('poll-options');
-const results = document.getElementById('results');
-const shareUrl = document.getElementById('share-url');
-const copyUrlBtn = document.getElementById('copy-url-btn');
+const elements = {
+    pollForm: document.getElementById('poll-form'),
+    pollOptions: document.getElementById('poll-vote-options'),
+    addOptionBtn: document.getElementById('add-option-btn'),
+    shareUrl: document.getElementById('share-url'),
+    copyUrlBtn: document.getElementById('copy-url-btn'),
+    networkStatus: {
+        peerId: document.getElementById('peer-id'),
+        peerCount: document.getElementById('peer-count'),
+        indicator: document.getElementById('connection-indicator')
+    }
+};
 
 // Initialize P2P Connection
 function initializePeer() {
@@ -53,9 +54,9 @@ function initializePeer() {
         
         peer.on('open', id => {
             console.log('Connected with ID:', id);
-            networkStatus.peerId.textContent = `Your ID: ${id}`;
-            networkStatus.indicator.classList.add('connected');
-            networkStatus.indicator.classList.remove('error');
+            elements.networkStatus.peerId.textContent = `Your ID: ${id}`;
+            elements.networkStatus.indicator.classList.add('connected');
+            elements.networkStatus.indicator.classList.remove('error');
             loadPollFromUrl();
         });
 
@@ -63,8 +64,8 @@ function initializePeer() {
         
         peer.on('error', error => {
             console.error('Peer connection error:', error);
-            networkStatus.indicator.classList.remove('connected');
-            networkStatus.indicator.classList.add('error');
+            elements.networkStatus.indicator.classList.remove('connected');
+            elements.networkStatus.indicator.classList.add('error');
             
             // Attempt to reconnect after a delay
             setTimeout(() => {
@@ -76,8 +77,8 @@ function initializePeer() {
 
         peer.on('disconnected', () => {
             console.log('Disconnected from server. Attempting to reconnect...');
-            networkStatus.indicator.classList.remove('connected');
-            networkStatus.peerId.textContent = 'Reconnecting...';
+            elements.networkStatus.indicator.classList.remove('connected');
+            elements.networkStatus.peerId.textContent = 'Reconnecting...';
             
             // Attempt to reconnect
             setTimeout(() => {
@@ -88,8 +89,8 @@ function initializePeer() {
         });
     } catch (error) {
         console.error('Failed to initialize peer:', error);
-        networkStatus.indicator.classList.add('error');
-        networkStatus.peerId.textContent = 'Connection failed';
+        elements.networkStatus.indicator.classList.add('error');
+        elements.networkStatus.peerId.textContent = 'Connection failed';
     }
 }
 
@@ -127,34 +128,51 @@ function connectToPeer(peerId) {
 }
 
 function updatePeerCount() {
-    networkStatus.peerCount.textContent = `Connected Peers: ${connections.size}`;
+    elements.networkStatus.peerCount.textContent = `Connected Peers: ${connections.size}`;
 }
 
 // Data Handling
 function handleIncomingData(conn, data) {
-    console.log('Received data:', data); // Debug log
+    console.log('Received data:', data);
     
     switch (data.type) {
         case 'request_poll':
-            if (localPolls.has(peer.id)) {
+            console.log('Poll requested, checking local polls...');
+            if (peer && peer.id && localPolls.has(peer.id)) {
+                console.log('Sending poll:', localPolls.get(peer.id));
                 conn.send({
                     type: 'poll_data',
                     poll: localPolls.get(peer.id)
+                });
+            } else {
+                console.log('No poll found to send');
+                conn.send({
+                    type: 'error',
+                    message: 'No active poll found'
                 });
             }
             break;
             
         case 'poll_data':
-            console.log('Received poll data:', data.poll); // Debug log
-            localPolls.set(data.poll.id, data.poll);
-            activePollId = data.poll.id;
-            displayPoll(data.poll);
+            console.log('Received poll data:', data.poll);
+            if (data.poll && data.poll.id) {
+                localPolls.set(data.poll.id, data.poll);
+                activePollId = data.poll.id;
+                displayPoll(data.poll);
+            }
             break;
             
         case 'vote':
-            console.log('Received vote:', data); // Debug log
-            handleVote(data.option);
-            broadcastToOtherPeers(conn, data);
+            console.log('Received vote:', data);
+            if (data.option !== undefined) {
+                handleVote(data.option);
+                broadcastToOtherPeers(conn, data);
+            }
+            break;
+            
+        case 'error':
+            console.error('Received error:', data.message);
+            // Handle error appropriately
             break;
     }
 }
@@ -200,27 +218,53 @@ async function createPoll(question, options, settings = {}) {
 
 // Poll Display
 function displayPoll(poll) {
-    sections.creator.classList.add('hidden');
-    sections.voter.classList.remove('hidden');
-    sections.share.classList.remove('hidden');
-    
-    document.getElementById('poll-question').textContent = poll.question;
-    
-    // Display options and results
-    displayPollOptions(poll);
-    displayResults(poll);
+    if (!poll) {
+        console.error('No poll data to display');
+        return;
+    }
+
+    try {
+        // Hide creator section and show voter/share sections
+        sections.creator.classList.add('hidden');
+        sections.voter.classList.remove('hidden');
+        sections.share.classList.remove('hidden');
+        
+        // Update question
+        const questionElement = document.getElementById('poll-question');
+        if (questionElement) {
+            questionElement.textContent = poll.question;
+        }
+        
+        // Display options and results
+        displayPollOptions(poll);
+        displayResults(poll);
+        
+        // Update share URL
+        updateShareUrl();
+    } catch (error) {
+        console.error('Error displaying poll:', error);
+    }
 }
 
 function displayPollOptions(poll) {
-    pollOptions.innerHTML = '';
-    
-    poll.options.forEach((option, index) => {
-        const button = document.createElement('button');
-        button.className = 'button button-secondary';
-        button.textContent = option;
-        button.onclick = () => submitVote(index);
-        pollOptions.appendChild(button);
-    });
+    if (!elements.pollOptions) {
+        console.error('Poll options container not found');
+        return;
+    }
+
+    try {
+        elements.pollOptions.innerHTML = '';
+        
+        poll.options.forEach((option, index) => {
+            const button = document.createElement('button');
+            button.className = 'button secondary';
+            button.textContent = option;
+            button.onclick = () => submitVote(index);
+            elements.pollOptions.appendChild(button);
+        });
+    } catch (error) {
+        console.error('Error displaying poll options:', error);
+    }
 }
 
 function displayResults(poll) {
@@ -292,8 +336,8 @@ function handleVote(optionIndex) {
 
 // URL Handling
 function updateShareUrl() {
-    const shareUrlInput = document.getElementById('share-url');
-    const shareSection = document.getElementById('share-section');
+    const shareUrlInput = elements.shareUrl;
+    const shareSection = sections.share;
     
     if (!shareUrlInput || !shareSection) {
         console.error('Share URL elements not found');
@@ -383,8 +427,8 @@ async function initializeApp() {
     } catch (error) {
         console.error('Failed to initialize application:', error);
         // Show error to user
-        networkStatus.peerId.textContent = 'Failed to initialize application';
-        networkStatus.indicator.classList.add('error');
+        elements.networkStatus.peerId.textContent = 'Failed to initialize application';
+        elements.networkStatus.indicator.classList.add('error');
     }
 }
 
@@ -397,11 +441,11 @@ function setupEventListeners() {
 
     // Network status updates
     peer.on('connection', () => {
-        networkStatus.indicator.classList.add('connected');
+        elements.networkStatus.indicator.classList.add('connected');
     });
 
     peer.on('disconnected', () => {
-        networkStatus.indicator.classList.remove('connected');
+        elements.networkStatus.indicator.classList.remove('connected');
     });
 
     // Template management
@@ -424,7 +468,7 @@ function setupEventListeners() {
     }
 
     // Poll form submission
-    pollForm.addEventListener('submit', async (e) => {
+    elements.pollForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
         const question = document.getElementById('question').value;
@@ -438,19 +482,19 @@ function setupEventListeners() {
     });
 
     // Add option button
-    addOptionBtn.addEventListener('click', () => {
+    elements.addOptionBtn.addEventListener('click', () => {
         const optionsDiv = document.getElementById('poll-options');
         const currentOptions = optionsDiv.querySelectorAll('.option-input-group').length;
         addOption(currentOptions + 1);
     });
 
     // Copy URL button
-    copyUrlBtn.addEventListener('click', async () => {
+    elements.copyUrlBtn.addEventListener('click', async () => {
         try {
-            await navigator.clipboard.writeText(shareUrl.value);
-            copyUrlBtn.textContent = 'Copied!';
+            await navigator.clipboard.writeText(elements.shareUrl.value);
+            elements.copyUrlBtn.textContent = 'Copied!';
             setTimeout(() => {
-                copyUrlBtn.textContent = 'Copy URL';
+                elements.copyUrlBtn.textContent = 'Copy URL';
             }, 2000);
         } catch (err) {
             console.error('Failed to copy URL:', err);
