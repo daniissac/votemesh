@@ -1,3 +1,11 @@
+// Wait for storage initialization
+let storageReady = false;
+document.addEventListener('DOMContentLoaded', async () => {
+    await storageManager.initializeIndexedDB();
+    storageReady = true;
+    initializeApp();
+});
+
 // P2P Connection Management
 let peer = null;
 let connections = new Set();
@@ -117,29 +125,35 @@ function broadcastToOtherPeers(sourceConn, data) {
     }
 }
 
-// Poll Creation
-function createPoll(question, options) {
+// Enhanced Poll Creation
+async function createPoll(question, options, settings = {}) {
     const poll = {
         id: peer.id,
         question,
-        options: options.map(text => ({
-            text,
-            votes: 0
-        }))
+        options,
+        settings: {
+            multipleChoice: settings.multipleChoice || false,
+            hideResults: settings.hideResults || false
+        },
+        votes: {},
+        createdAt: Date.now()
     };
     
-    localPolls.set(peer.id, poll);
-    activePollId = peer.id;
+    await storageManager.savePoll(poll);
+    localPolls.set(poll.id, poll);
+    activePollId = poll.id;
+    
+    // Broadcast to peers
+    broadcastToOtherPeers(null, {
+        type: 'poll_data',
+        poll
+    });
+    
     displayPoll(poll);
     updateShareUrl();
     
-    // Broadcast poll to connected peers
-    for (const conn of connections) {
-        conn.send({
-            type: 'poll_data',
-            poll
-        });
-    }
+    // Initialize analytics
+    analyticsManager.trackVote(poll.id, null, poll.createdAt);
 }
 
 // Poll Display
@@ -161,34 +175,43 @@ function displayPollOptions(poll) {
     poll.options.forEach((option, index) => {
         const button = document.createElement('button');
         button.className = 'button button-secondary';
-        button.textContent = option.text;
+        button.textContent = option;
         button.onclick = () => submitVote(index);
         pollOptions.appendChild(button);
     });
 }
 
 function displayResults(poll) {
-    results.innerHTML = '';
+    const resultsDiv = document.getElementById('results');
+    if (!poll || !resultsDiv) return;
+
+    const totalVotes = Object.values(poll.votes).flat().length;
+    const voteCounts = {};
     
-    const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
+    // Count votes for each option
+    Object.values(poll.votes).flat().forEach(vote => {
+        voteCounts[vote] = (voteCounts[vote] || 0) + 1;
+    });
     
-    poll.options.forEach(option => {
-        const percentage = totalVotes > 0 ? (option.votes / totalVotes * 100).toFixed(1) : 0;
+    // Display results
+    resultsDiv.innerHTML = poll.options.map((option, index) => {
+        const count = voteCounts[index] || 0;
+        const percentage = totalVotes ? (count / totalVotes * 100).toFixed(1) : 0;
         
-        const resultBar = document.createElement('div');
-        resultBar.className = 'result-bar';
-        resultBar.innerHTML = `
-            <div class="result-header">
-                <span class="result-text">${option.text}</span>
-                <span class="result-votes">${option.votes} votes (${percentage}%)</span>
-            </div>
-            <div class="result-bar-bg">
-                <div class="result-bar-fill" style="width: ${percentage}%"></div>
+        return `
+            <div class="result-item">
+                <div class="result-label">
+                    <span>${option}</span>
+                    <span>${count} votes (${percentage}%)</span>
+                </div>
+                <div class="result-bar" style="width: ${percentage}%"></div>
             </div>
         `;
-        
-        results.appendChild(resultBar);
-    });
+    }).join('');
+    
+    // Update analytics charts
+    analyticsManager.renderVoteDistribution(poll.id, 'vote-distribution-chart');
+    analyticsManager.renderVotingTrend(poll.id, 'voting-trend-chart');
 }
 
 // Vote Handling
@@ -217,7 +240,11 @@ function handleVote(optionIndex) {
         return;
     }
     
-    poll.options[optionIndex].votes++;
+    if (!poll.votes[peer.id]) {
+        poll.votes[peer.id] = [];
+    }
+    
+    poll.votes[peer.id].push(optionIndex);
     displayResults(poll);
 }
 
@@ -234,6 +261,45 @@ function loadPollFromUrl() {
     
     if (peerId && peerId !== peer.id) {
         connectToPeer(peerId);
+    }
+}
+
+// Template Integration
+function initializeTemplates() {
+    const templatesList = document.getElementById('templates-list');
+    const createTemplateBtn = document.getElementById('create-template-btn');
+    
+    createTemplateBtn.addEventListener('click', () => {
+        // Show template creation modal
+        showTemplateModal();
+    });
+    
+    // Load and display templates
+    refreshTemplatesList();
+}
+
+async function refreshTemplatesList() {
+    const templatesList = document.getElementById('templates-list');
+    const templates = await templatesManager.getAllTemplates();
+    
+    templatesList.innerHTML = templates.map(template => `
+        <div class="template-card" data-template-id="${template.id}">
+            <h3>${template.name}</h3>
+            <p>${template.question}</p>
+        </div>
+    `).join('');
+    
+    // Add click handlers
+    templatesList.querySelectorAll('.template-card').forEach(card => {
+        card.addEventListener('click', () => useTemplate(card.dataset.templateId));
+    });
+}
+
+async function useTemplate(templateId) {
+    const poll = await templatesManager.createPollFromTemplate(templateId);
+    if (poll) {
+        document.getElementById('question').value = poll.question;
+        updatePollOptions(poll.options);
     }
 }
 
@@ -280,5 +346,49 @@ copyUrlBtn.addEventListener('click', async () => {
     }
 });
 
+document.getElementById('export-results-btn').addEventListener('click', async () => {
+    if (!activePollId) return;
+    
+    const poll = localPolls.get(activePollId);
+    if (!poll) return;
+    
+    const data = {
+        question: poll.question,
+        options: poll.options,
+        votes: poll.votes,
+        createdAt: poll.createdAt
+    };
+    
+    downloadJson(data, `poll-results-${activePollId}.json`);
+});
+
+document.getElementById('export-analytics-btn').addEventListener('click', async () => {
+    if (!activePollId) return;
+    
+    const analytics = await analyticsManager.exportAnalytics(activePollId);
+    if (!analytics) return;
+    
+    downloadJson(analytics, `poll-analytics-${activePollId}.json`);
+});
+
+function downloadJson(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Initialize templates when app starts
+function initializeApp() {
+    initializePeer();
+    initializeTemplates();
+    setupEventListeners();
+}
+
 // Initialize
-initializePeer();
+initializeApp();

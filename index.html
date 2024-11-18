@@ -8,12 +8,23 @@
     <link rel="icon" type="image/svg+xml" href="votemesh-icon.svg">
     <link rel="stylesheet" href="styles.css">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="js/storage.js" defer></script>
+    <script src="js/templates.js" defer></script>
+    <script src="js/analytics.js" defer></script>
+    <script src="app.js" defer></script>
 </head>
 <body>
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>VoteMesh</h1>
+            <div class="logo">
+                <svg class="mesh-icon" viewBox="0 0 24 24" width="48" height="48">
+                    <path fill="currentColor" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                </svg>
+                <h1>VoteMesh</h1>
+            </div>
             <p>Decentralized P2P Polling</p>
         </div>
 
@@ -21,20 +32,35 @@
         <div id="network-status" class="network-status">
             <div class="network-header">
                 <div class="network-info">
-                    <h3>Network Status</h3>
-                    <p id="peer-count">Connected Peers: 0</p>
-                    <p id="peer-id">Your ID: Connecting...</p>
+                    <h3><i data-feather="activity"></i> Network Status</h3>
+                    <p><i data-feather="users"></i> <span id="peer-count">Connected Peers: 0</span></p>
+                    <p><i data-feather="hash"></i> <span id="peer-id">Your ID: Connecting...</span></p>
                 </div>
-                <div id="connection-indicator" class="connection-indicator"></div>
+                <div id="connection-indicator" class="connection-indicator">
+                    <i data-feather="wifi"></i>
+                </div>
             </div>
+        </div>
+
+        <!-- Templates Section -->
+        <div id="templates-section" class="card">
+            <h2><i data-feather="layout"></i> Poll Templates</h2>
+            <div class="templates-list" id="templates-list">
+                <!-- Templates will be populated here -->
+            </div>
+            <button id="create-template-btn" class="button">
+                <i data-feather="plus-circle"></i> Create New Template
+            </button>
         </div>
 
         <!-- Poll Creation -->
         <div id="creator-section" class="card">
-            <h2>Create New Poll</h2>
+            <h2><i data-feather="edit-3"></i> Create New Poll</h2>
             <form id="poll-form" class="space-y-4">
                 <div class="form-group">
-                    <label for="question" class="form-label">Question</label>
+                    <label for="question" class="form-label">
+                        <i data-feather="help-circle"></i> Question
+                    </label>
                     <input type="text" 
                            id="question" 
                            name="question"
@@ -46,69 +72,104 @@
                 </div>
                 
                 <div id="options-container" class="space-y-2">
-                    <label class="form-label">Options</label>
-                    <div class="option-input-group">
-                        <input type="text" 
-                               name="option[]"
-                               class="form-input" 
-                               placeholder="Option 1"
-                               minlength="1"
-                               maxlength="100"
-                               required>
+                    <label class="form-label">
+                        <i data-feather="list"></i> Options
+                    </label>
+                    <div id="poll-options" class="space-y-2">
+                        <!-- Poll options will be added here -->
                     </div>
-                    <div class="option-input-group">
-                        <input type="text" 
-                               name="option[]"
-                               class="form-input" 
-                               placeholder="Option 2"
-                               minlength="1"
-                               maxlength="100"
-                               required>
+                    <button type="button" id="add-option-btn" class="button secondary">
+                        <i data-feather="plus"></i> Add Option
+                    </button>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <i data-feather="settings"></i> Poll Settings
+                    </label>
+                    <div class="settings-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="multiple-choice" name="multiple-choice">
+                            <i data-feather="check-square"></i> Allow multiple choices
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="hide-results" name="hide-results">
+                            <i data-feather="eye-off"></i> Hide results until voting ends
+                        </label>
                     </div>
                 </div>
 
-                <div class="button-group">
-                    <button type="button" 
-                            id="add-option-btn"
-                            class="button button-secondary">
-                        Add Option
-                    </button>
-                    <button type="submit"
-                            class="button button-primary">
-                        Create Poll
-                    </button>
-                </div>
+                <button type="submit" class="button primary">
+                    <i data-feather="send"></i> Create Poll
+                </button>
             </form>
         </div>
 
-        <!-- Active Poll -->
+        <!-- Voter Section -->
         <div id="voter-section" class="card hidden">
-            <h2 id="poll-question"></h2>
-            <div id="poll-options" class="space-y-2"></div>
-            <div id="results" class="space-y-2"></div>
+            <h2><i data-feather="check-circle"></i> Vote on Poll</h2>
+            <div id="poll-question" class="poll-question"></div>
+            <div id="poll-vote-options" class="space-y-2">
+                <!-- Voting options will be added here -->
+            </div>
+            <button id="submit-vote-btn" class="button primary">
+                <i data-feather="check"></i> Submit Vote
+            </button>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" class="card">
+            <h2><i data-feather="bar-chart-2"></i> Poll Results</h2>
+            <div id="results" class="results-container">
+                <!-- Results will be displayed here -->
+            </div>
+            
+            <!-- Analytics Charts -->
+            <div class="analytics-container">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <i data-feather="pie-chart"></i>
+                        <h3>Vote Distribution</h3>
+                    </div>
+                    <canvas id="vote-distribution-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <i data-feather="trending-up"></i>
+                        <h3>Voting Trend</h3>
+                    </div>
+                    <canvas id="voting-trend-chart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Export Options -->
+            <div class="export-options">
+                <button id="export-results-btn" class="button secondary">
+                    <i data-feather="download"></i> Export Results
+                </button>
+                <button id="export-analytics-btn" class="button secondary">
+                    <i data-feather="download-cloud"></i> Export Analytics
+                </button>
+            </div>
         </div>
 
         <!-- Share Section -->
         <div id="share-section" class="card hidden">
-            <h3>Share Poll</h3>
-            <div class="share-group">
-                <input type="text" 
-                       id="share-url" 
-                       name="share-url"
-                       class="form-input share-input"
-                       readonly
-                       aria-label="Share URL">
-                <button id="copy-url-btn"
-                        type="button"
-                        class="button button-blue"
-                        aria-label="Copy share URL">
-                    Copy Link
+            <h2><i data-feather="share-2"></i> Share Poll</h2>
+            <div class="share-url-container">
+                <input type="text" id="share-url" readonly class="share-input">
+                <button id="copy-url-btn" class="button">
+                    <i data-feather="copy"></i> Copy URL
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Scripts -->
-    <script type="module" src="app.js"></script>
+    <script>
+        // Initialize Feather icons
+        document.addEventListener('DOMContentLoaded', () => {
+            feather.replace();
+        });
+    </script>
 </body>
 </html>
