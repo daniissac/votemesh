@@ -317,21 +317,31 @@ pollForm.addEventListener('submit', e => {
     }
 });
 
-addOptionBtn.addEventListener('click', () => {
-    const container = document.getElementById('options-container');
-    const optionCount = container.children.length;
-    
+document.addEventListener('DOMContentLoaded', () => {
+    // Add two default options
+    for (let i = 1; i <= 2; i++) {
+        addOption(i);
+    }
+});
+
+function addOption(number) {
+    const optionsDiv = document.getElementById('poll-options');
     const optionGroup = document.createElement('div');
     optionGroup.className = 'option-input-group';
     optionGroup.innerHTML = `
         <input type="text"
                name="option[]"
                class="form-input"
-               placeholder="Option ${optionCount + 1}"
+               placeholder="Option ${number}"
                required>
     `;
-    
-    container.appendChild(optionGroup);
+    optionsDiv.appendChild(optionGroup);
+}
+
+addOptionBtn.addEventListener('click', () => {
+    const optionsDiv = document.getElementById('poll-options');
+    const currentOptions = optionsDiv.querySelectorAll('.option-input-group').length;
+    addOption(currentOptions + 1);
 });
 
 copyUrlBtn.addEventListener('click', async () => {
